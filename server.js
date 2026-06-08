@@ -30,15 +30,25 @@ const reservationSchema = new mongoose.Schema({
 const Reservation = mongoose.model('Reservation', reservationSchema);
 
 // 📥 API①：予約を申し込む（フォーム / ボード共通）
-app.post('/api/reservations', async (req, res) => {
-    console.log("📥 新規予約の登録:", req.body);
+app.post('/api/notify-line', async (req, res) => {
+    const { id, message } = req.body;
     try {
-        const newReservation = new Reservation(req.body);
-        await newReservation.save();
-        res.status(201).json(newReservation);
+        const response = await fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.LINE_ACCESS_TOKEN}`
+            },
+            body: JSON.stringify({
+                to: process.env.LINE_USER_ID,
+                messages: [{ type: 'text', text: message }]
+            })
+        });
+        const result = await response.json();
+        res.status(200).json(result);
     } catch (error) {
-        console.error("❌ 保存エラー:", error);
-        res.status(500).json({ error: '予約に失敗しました' });
+        console.error('LINE通知エラー:', error);
+        res.status(500).json({ error: 'LINE通知失敗' });
     }
 });
 
