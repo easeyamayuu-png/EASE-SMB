@@ -4,7 +4,6 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-// 💡 Renderが指定するポート番号、またはローカルの3000番を自動で切り替える設定
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
@@ -12,9 +11,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 🔌 データベース（MongoDB）への接続設定
-// ローカル環境ならパソコン内のテスト用DB、Render上なら本番用DBに自動で繋ぎます
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ease_smb';
-mongoose.connect(MONGODB_URI)
+const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/ease_smb';
+mongoose.connect(mongoURI)
     .then(() => console.log('🍃 MongoDBに無事接続されました！'))
     .catch(err => console.error('❌ DB接続エラー:', err));
 
@@ -31,7 +29,7 @@ const reservationSchema = new mongoose.Schema({
 
 const Reservation = mongoose.model('Reservation', reservationSchema);
 
-// 📥 API①：予約を申し込む（お客様フォームから）
+// 📥 API①：予約を申し込む
 app.post('/api/reservations', async (req, res) => {
     try {
         const newReservation = new Reservation(req.body);
@@ -42,11 +40,10 @@ app.post('/api/reservations', async (req, res) => {
     }
 });
 
-// 📤 API②：予約一覧を取得する（管理画面用）
+// 📤 API②：予約一覧を取得する
 app.get('/api/reservations', async (req, res) => {
     try {
         const reservations = await Reservation.find();
-        // フロントエンドの表記（id）に合わせるため変換して返す
         const formatted = reservations.map(r => ({
             id: r._id,
             customerName: r.customerName,
