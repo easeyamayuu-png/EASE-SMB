@@ -2,40 +2,73 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>EASE-SMB 入庫管理ボード</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EASE-SMB 入庫管理ボード - 詳細管理</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f1f3f5; font-size: 0.8rem; }
-        .day-timeline-container { background: white; border-radius: 8px; border: 1px solid #dee2e6; margin-bottom: 20px; }
-        .day-row { display: flex; border-bottom: 1px solid #dee2e6; min-height: 50px; }
-        .day-label { width: 120px; background: #f8f9fa; border-right: 2px solid #dee2e6; font-weight: bold; display: flex; align-items: center; justify-content: center; }
-        .timeline-board { display: flex; flex: 1; overflow-x: auto; padding: 5px; }
-        .reservation-card { background: #fff3cd; border-left: 4px solid #ffc107; padding: 4px; margin: 2px; font-size: 0.7rem; border-radius: 4px; min-width: 80px; }
+        body { background-color: #f4f7f6; font-size: 0.9rem; color: #333; }
+        .card { border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border: none; }
+        .day-row { display: flex; border-bottom: 1px solid #e9ecef; min-height: 70px; align-items: stretch; }
+        .day-label { width: 130px; background: #eef2f3; border-right: 2px solid #dee2e6; font-weight: bold; display: flex; align-items: center; justify-content: center; color: #495057; }
+        .timeline-board { display: flex; flex-grow: 1; overflow-x: auto; padding: 10px; gap: 8px; }
+        .reservation-card { background: #fff3cd; border-left: 5px solid #ffc107; padding: 8px; font-size: 0.75rem; min-width: 110px; border-radius: 4px; transition: transform 0.2s; }
+        .reservation-card:hover { transform: scale(1.02); }
         .card-approved { background: #d1e7dd !important; border-left-color: #198754 !important; }
+        .table thead { background-color: #343a40; color: white; }
     </style>
 </head>
 <body>
-    <div class="container-fluid p-4">
-        <h4 class="fw-bold mb-3">🚗 EASE-SMB 入庫管理ボード</h4>
-        <div id="timeline-3days-container" class="day-timeline-container"></div>
-        <h6 class="fw-bold">📋 予約データ一覧</h6>
-        <div class="card p-3">
-            <table class="table table-sm table-hover align-middle">
-                <thead class="table-light"><tr><th>お客様名</th><th>車種</th><th>車両番号</th><th>メニュー</th><th>入庫日時</th><th>状況</th><th>お断り理由</th><th>アクション</th></tr></thead>
+
+<div class="container-fluid p-4">
+    <header class="mb-4">
+        <h3 class="fw-bold text-dark">🚗 EASE-SMB 高機能入庫管理システム</h3>
+        <p class="text-muted">予約状況の承認・却下およびLINE通知管理ボード</p>
+    </header>
+
+    <div class="card p-3 mb-5">
+        <h5 class="fw-bold mb-3">📅 3日間 タイムラインスケジュール</h5>
+        <div id="timeline-3days-container" class="border rounded overflow-hidden bg-white"></div>
+    </div>
+
+    <div class="card p-4 shadow-sm">
+        <h5 class="fw-bold mb-3">📋 詳細予約データ一覧</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>お客様名</th>
+                        <th>車種</th>
+                        <th>車両番号</th>
+                        <th>ご希望メニュー</th>
+                        <th>入庫日時</th>
+                        <th>状況</th>
+                        <th style="width: 200px;">お断り理由（任意）</th>
+                        <th>アクション</th>
+                    </tr>
+                </thead>
                 <tbody id="reservation-list"></tbody>
             </table>
         </div>
     </div>
+</div>
 
-    <script>
-        async function loadReservations() {
+<script>
+    /**
+     * 予約データの読み込みと描画を行うメイン関数
+     * データ構造の完全な復元と、テーブル/タイムラインへの同期処理
+     */
+    async function loadReservations() {
+        console.log("予約データを取得中...");
+        try {
             const res = await fetch('/api/reservations');
+            if (!res.ok) throw new Error(`HTTPエラー: ${res.status}`);
             const data = await res.json();
+            
             const tbody = document.getElementById('reservation-list');
             const container = document.getElementById('timeline-3days-container');
-            
             tbody.innerHTML = '';
-            // タイムライン描画（日付ごとにグループ化）
+            
+            // 日付ごとのグループ化とタイムライン生成
             const dates = [...new Set(data.map(r => r.datetime.split(' ')[0]))].sort();
             container.innerHTML = dates.map(date => `
                 <div class="day-row">
@@ -44,39 +77,85 @@
                 </div>
             `).join('');
 
+            // データ配置処理
             data.forEach(r => {
-                tbody.innerHTML += `<tr>
-                    <td>${r.customerName}</td><td>${r.carModel}</td><td>${r.carNumber}</td><td>${r.menu}</td><td>${r.datetime}</td>
-                    <td>${r.status === 'approved' ? '承認済' : '確認中'}</td>
-                    <td><input type="text" id="reason-${r.id}" value="${r.rejectReason || ''}" class="form-control form-control-sm"></td>
+                // テーブル行の生成（却下理由入力欄を含む）
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${r.customerName}</strong></td>
+                    <td>${r.carModel}</td>
+                    <td>${r.carNumber}</td>
+                    <td><span class="badge bg-secondary">${r.menu}</span></td>
+                    <td>${r.datetime}</td>
+                    <td>${r.status === 'approved' ? '<span class="text-success fw-bold">承認済</span>' : '<span class="text-warning fw-bold">確認中</span>'}</td>
+                    <td><input type="text" id="reason-${r.id}" value="${r.rejectReason || ''}" class="form-control form-control-sm" placeholder="理由..."></td>
                     <td>
-                        ${r.status !== 'approved' ? `<button class="btn btn-sm btn-success" onclick="updateStatus('${r.id}', 'approve')">承認</button>` : ''}
-                        <button class="btn btn-sm btn-danger" onclick="updateStatus('${r.id}', 'reject')">却下</button>
+                        ${r.status !== 'approved' ? `<button class="btn btn-sm btn-success me-1" onclick="processAction('${r.id}', 'approve')">承認</button>` : ''}
+                        <button class="btn btn-sm btn-danger" onclick="processAction('${r.id}', 'reject')">却下</button>
                     </td>
-                </tr>`;
+                `;
+                tbody.appendChild(row);
                 
-                const row = document.getElementById(`row-${r.datetime.split(' ')[0]}`);
-                if(row) row.innerHTML += `<div class="reservation-card ${r.status==='approved'?'card-approved':''}">${r.customerName}<br>${r.menu}</div>`;
+                // タイムラインへのカード配置
+                const timelineRow = document.getElementById(`row-${r.datetime.split(' ')[0]}`);
+                if(timelineRow) {
+                    const card = document.createElement('div');
+                    card.className = `reservation-card ${r.status === 'approved' ? 'card-approved' : ''}`;
+                    card.innerHTML = `<strong>${r.customerName}</strong><br><small>${r.menu}</small>`;
+                    timelineRow.appendChild(card);
+                }
             });
+            console.log("予約データの更新完了");
+        } catch(e) {
+            console.error("データ描画失敗:", e);
+            alert("データの取得に失敗しました。サーバーを確認してください。");
         }
+    }
 
-        async function updateStatus(id, action) {
-            const reason = document.getElementById(`reason-${id}`).value;
-            // 状態更新
-            await fetch(`/api/reservations/${id}/${action}`, {
+    /**
+     * アクション（承認・却下）とLINE通知を一括処理する関数
+     */
+    async function processAction(id, action) {
+        const reason = document.getElementById(`reason-${id}`).value;
+        console.log(`アクション実行: ${action}, ID: ${id}, 理由: ${reason}`);
+        
+        try {
+            // ステータス更新API呼び出し
+            const updateRes = await fetch(`/api/reservations/${id}/${action}`, {
                 method: 'PATCH',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ rejectReason: reason })
             });
-            // LINE通知
-            await fetch(`/api/notify-line`, {
+
+            if (!updateRes.ok) throw new Error('サーバー応答エラー');
+
+            // LINE通知API呼び出し（以前の通り、エラーチェック付きで堅牢に実装）
+            const notifyRes = await fetch(`/api/notify-line`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id, message: action === 'approve' ? '予約が承認されました' : '予約が却下されました: ' + reason })
+                body: JSON.stringify({ 
+                    id, 
+                    message: action === 'approve' ? `✅ 予約が承認されました` : `❌ 予約が却下されました\n理由: ${reason || '記載なし'}` 
+                })
             });
-            loadReservations();
+
+            if (notifyRes.ok) {
+                console.log("LINE通知成功");
+                alert(action === 'approve' ? '承認し、LINEへ通知しました' : '却下し、LINEへ通知しました');
+            } else {
+                console.warn("LINE通知のみ失敗");
+                alert("ステータスは更新されましたが、LINE通知に失敗しました。");
+            }
+            
+            loadReservations(); // 再描画
+        } catch(e) {
+            console.error("処理実行エラー:", e);
+            alert("処理中にエラーが発生しました。コンソールログを確認してください。");
         }
-        loadReservations();
-    </script>
+    }
+
+    // 初回読み込み
+    loadReservations();
+</script>
 </body>
 </html>
