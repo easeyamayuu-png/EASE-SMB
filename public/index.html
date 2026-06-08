@@ -10,71 +10,48 @@
         .navbar-brand { font-weight: bold; }
         .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 10px; }
         .table th { background-color: #f8f9fa; }
-        
         .day-timeline-container { background: white; border-radius: 8px; border: 1px solid #dee2e6; overflow: hidden; }
         .day-row { display: flex; align-items: stretch; border-bottom: 1px solid #dee2e6; }
-        .day-row:last-child { border-bottom: none; }
-        
-        .day-label { width: 110px; background-color: #f8f9fa; border-right: 2px solid #dee2e6; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; text-align: center; padding: 5px; color: #212529; }
-        
+        .day-label { width: 110px; background-color: #f8f9fa; border-right: 2px solid #dee2e6; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; padding: 5px; }
         .timeline-board-horizontal { display: flex; flex: 1; width: 100%; }
         .timeline-column { flex: 1; min-width: 0; border-right: 1px solid #eee; display: flex; flex-direction: column; }
-        .timeline-column:last-child { border-right: none; }
-        
-        .timeline-hour-header { background-color: #e9ecef; font-weight: bold; text-align: center; padding: 2px 0; font-size: 0.55rem; border-bottom: 1px solid #dee2e6; color: #495057; line-height: 1.1; }
-        
-        /* 💡 マスをクリック可能に */
+        .timeline-hour-header { background-color: #e9ecef; font-weight: bold; text-align: center; padding: 2px 0; font-size: 0.55rem; border-bottom: 1px solid #dee2e6; }
         .timeline-slots-horizontal { padding: 3px 1px; flex: 1; display: flex; flex-direction: column; gap: 2px; min-height: 45px; background-color: #fff; cursor: pointer; }
         .timeline-slots-horizontal:hover { background-color: #e7f1ff; }
-        
-        .reservation-card { background: #fff3cd; border-left: 2px solid #ffc107; padding: 1px 2px; border-radius: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); font-size: 0.55rem; line-height: 1.1; word-break: break-all; }
+        .reservation-card { background: #fff3cd; border-left: 2px solid #ffc107; padding: 1px 2px; border-radius: 2px; font-size: 0.55rem; }
         .card-approved { background: #d1e7dd !important; border-left-color: #198754 !important; color: #0f5132; }
-        
-        .empty-text { font-size: 0.5rem; color: #f0f0f0; text-align: center; margin: auto 0; pointer-events: none; }
-        .date-btn { font-weight: bold; }
+        .empty-text { font-size: 0.5rem; color: #f0f0f0; text-align: center; margin: auto 0; }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-dark bg-dark"><div class="container-fluid px-4"><span class="navbar-brand mb-0 h1">🚗 EASE-SMB 入庫管理 & 3連高密度ボード</span></div></nav>
+    <nav class="navbar navbar-dark bg-dark"><div class="container-fluid px-4"><span class="navbar-brand">🚗 EASE-SMB 入庫管理ボード</span></div></nav>
 
     <div class="container-fluid px-4 my-3">
         <div class="d-flex align-items-center justify-content-between mb-2">
-            <h6 class="fw-bold text-secondary mb-0">📅 3日間スケジュール（マスをクリックで電話予約追加）</h6>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-outline-dark btn-sm date-btn" onclick="moveDate(-1)">◀ 前日</button>
-                <input type="date" id="base-date" class="form-control form-control-sm fw-bold text-center" style="width: 140px;">
-                <button class="btn btn-outline-dark btn-sm date-btn" onclick="moveDate(1)">翌日 ▶</button>
+            <h6 class="fw-bold text-secondary">📅 3日間スケジュール</h6>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-dark btn-sm" onclick="moveDate(-1)">◀ 前日</button>
+                <input type="date" id="base-date" class="form-control form-control-sm" style="width: 140px;">
+                <button class="btn btn-outline-dark btn-sm" onclick="moveDate(1)">翌日 ▶</button>
             </div>
         </div>
-
         <div class="card p-2 mb-4"><div class="day-timeline-container" id="timeline-3days-container"></div></div>
-
         <h6 class="mb-2 fw-bold text-secondary">📋 予約データ一覧</h6>
-        <div class="card p-3"><div class="table-responsive"><table class="table table-sm table-hover align-middle" style="font-size: 0.8rem;"><thead><tr><th>お客様名</th><th>車種</th><th>車両番号</th><th>メニュー</th><th>入庫日時</th><th>ステータス</th><th>お断り理由</th><th>アクション</th></tr></thead><tbody id="reservation-list"></tbody></table></div></div>
+        <div class="card p-3"><table class="table table-sm table-hover align-middle"><thead class="table-light"><tr><th>お客様名</th><th>車種</th><th>メニュー</th><th>入庫日時</th><th>ステータス</th><th>アクション</th></tr></thead><tbody id="reservation-list"></tbody></table></div>
     </div>
 
-    <div class="modal fade" id="addReservationModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5>電話予約の追加</h5></div>
-                <div class="modal-body">
-                    <input type="text" id="new-name" class="form-control mb-2" placeholder="お客様名">
-                    <input type="text" id="new-car" class="form-control mb-2" placeholder="車種">
-                    <input type="text" id="new-menu" class="form-control mb-2" placeholder="メニュー">
-                    <input type="hidden" id="target-datetime">
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
-                    <button class="btn btn-primary" onclick="saveManualReservation()">ボードに反映</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div class="modal fade" id="addReservationModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5>電話予約の追加</h5></div><div class="modal-body"><input type="text" id="new-name" class="form-control mb-2" placeholder="お客様名"><input type="text" id="new-car" class="form-control mb-2" placeholder="車種"><input type="text" id="new-menu" class="form-control mb-2" placeholder="メニュー"><input type="hidden" id="target-datetime"></div><div class="modal-footer"><button class="btn btn-primary" onclick="saveManualReservation()">ボードに反映</button></div></div></div></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const today = new Date();
-        document.getElementById('base-date').value = formatDateString(today);
+        const operatingHours = [];
+        for (let h = 9; h <= 18; h++) {
+            ['00', '15', '30', '45'].forEach(m => operatingHours.push(`${String(h).padStart(2,'0')}:${m}`));
+        }
+
+        function formatDateString(d) { return d.toISOString().split('T')[0]; }
+        
+        document.getElementById('base-date').value = formatDateString(new Date());
         document.getElementById('base-date').addEventListener('change', loadReservations);
 
         function moveDate(days) {
@@ -84,60 +61,46 @@
             loadReservations();
         }
 
-        function formatDateString(dateObj) {
-            return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-        }
-
-        const operatingHours = [];
-        for (let h = 9; h <= 18; h++) {
-            const s = String(h).padStart(2, '0');
-            operatingHours.push(`${s}:00`, `${s}:15`, `${s}:30`, `${s}:45`);
-        }
-
         function initTimeline3Days(dateStrings) {
             const container = document.getElementById('timeline-3days-container');
             container.innerHTML = '';
-            dateStrings.forEach((dateStr, index) => {
-                let rowHtml = `<div class="day-row"><div class="day-label">${dateStr.substring(5)}</div><div class="timeline-board-horizontal">`;
+            dateStrings.forEach((dateStr, i) => {
+                let row = `<div class="day-row"><div class="day-label">${dateStr.substring(5)}</div><div class="timeline-board-horizontal">`;
                 operatingHours.forEach(hour => {
-                    const hId = hour.replace(':', '-');
-                    rowHtml += `<div class="timeline-column">${index === 0 ? `<div class="timeline-hour-header">${hour.endsWith(':00') ? hour : hour.split(':')[1]}</div>` : ''}<div class="timeline-slots-horizontal" id="slot-${dateStr}-${hId}" onclick="openModal('${dateStr}', '${hour}')"><span class="empty-text" id="empty-${dateStr}-${hId}">-</span></div></div>`;
+                    row += `<div class="timeline-column"><div class="timeline-slots-horizontal" id="slot-${dateStr}-${hour.replace(':','-')}" onclick="openModal('${dateStr}','${hour}')"><span class="empty-text">-</span></div></div>`;
                 });
-                container.innerHTML += rowHtml + `</div></div>`;
+                container.innerHTML += row + `</div></div>`;
             });
         }
 
-        function openModal(dateStr, hour) {
-            document.getElementById('target-datetime').value = `${dateStr} ${hour}`;
-            new bootstrap.Modal(document.getElementById('addReservationModal')).show();
-        }
+        function openModal(d, h) { document.getElementById('target-datetime').value = `${d} ${h}`; new bootstrap.Modal(document.getElementById('addReservationModal')).show(); }
 
         async function saveManualReservation() {
-            const data = {
+            await fetch('/api/reservations', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({
                 customerName: document.getElementById('new-name').value,
                 carModel: document.getElementById('new-car').value,
                 menu: document.getElementById('new-menu').value,
                 datetime: document.getElementById('target-datetime').value,
-                status: 'approved',
-                carNumber: '電話受付'
-            };
-            await fetch('/api/reservations', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+                status: 'approved'
+            })});
             location.reload();
         }
 
         async function loadReservations() {
-            const baseDateStr = document.getElementById('base-date').value;
-            const d = new Date(baseDateStr);
-            const targetDates = [formatDateString(d), formatDateString(new Date(new Date(d).setDate(d.getDate()+1))), formatDateString(new Date(new Date(d).setDate(d.getDate()+2)))];
-            initTimeline3Days(targetDates);
-
+            const d = new Date(document.getElementById('base-date').value);
+            const dates = [formatDateString(d), formatDateString(new Date(d.getTime()+86400000)), formatDateString(new Date(d.getTime()+172800000))];
+            initTimeline3Days(dates);
             const res = await fetch('/api/reservations');
-            const reservations = await res.json();
-            
-            // リスト更新とボードへの配置（既存のロジックをここに統合してください）
-            // ※以前のコードに含まれていた reservations.forEach(...) 内の処理をそのまま流用可能です。
-            // ... (既存のテーブル生成・チップ配置ロジック) ...
+            const data = await res.json();
+            const tbody = document.getElementById('reservation-list');
+            tbody.innerHTML = '';
+            data.forEach(r => {
+                tbody.innerHTML += `<tr><td>${r.customerName}</td><td>${r.carModel}</td><td>${r.menu}</td><td>${r.datetime}</td><td>${r.status}</td><td>${r.status==='pending'?`<button class="btn btn-sm btn-success" onclick="approve('${r.id}')">OK</button>`:''}</td></tr>`;
+                const slot = document.getElementById(`slot-${r.datetime.replace(':','-').replace(' ', '-')}`);
+                if(slot) { slot.querySelector('.empty-text').remove(); slot.innerHTML += `<div class="reservation-card ${r.status==='approved'?'card-approved':''}">${r.customerName.substring(0,3)}</div>`; }
+            });
         }
+        async function approve(id) { await fetch(`/api/reservations/${id}/approve`, {method:'PATCH'}); loadReservations(); }
         loadReservations();
     </script>
 </body>
