@@ -18,10 +18,10 @@
 </head>
 <body>
 <div class="container-fluid p-4">
-    <h3 class="fw-bold mb-3">🚗 EASE-SMB 総合入庫管理システム</h3>
+    <h3 class="fw-bold mb-3">🚗 EASE-SMB 高機能入庫管理システム</h3>
     <div id="timeline-area" class="timeline-wrapper"></div>
     <div class="card p-3 shadow-sm">
-        <h5 class="fw-bold mb-3">📋 予約詳細一覧</h5>
+        <h5 class="fw-bold mb-3">📋 予約詳細・承認管理</h5>
         <table class="table table-hover align-middle">
             <thead class="table-dark"><tr><th>氏名</th><th>車種</th><th>番号</th><th>メニュー</th><th>日時</th><th>状況</th><th>断り理由</th><th>アクション</th></tr></thead>
             <tbody id="reservation-list"></tbody>
@@ -37,7 +37,7 @@
         const res = await fetch('/api/reservations');
         const data = await res.json();
         
-        // 1. ソート: 確認中(pending) > 承認済(approved) > 断り済み(rejected)
+        // 1. ソート: 未承認(pending) > 承認済(approved) > 断り済み(rejected)
         const order = { 'pending': 0, 'approved': 1, 'rejected': 2 };
         data.sort((a, b) => order[a.status] - order[b.status]);
 
@@ -62,11 +62,11 @@
             const slot = document.getElementById(`slot-${d}-${parseInt(h)}-${m}`);
             if(slot) slot.innerHTML = `<div class="reservation-card ${r.status==='approved'?'card-approved':(r.status==='rejected'?'card-rejected':'')}">${r.customerName}</div>`;
 
-            // テーブル反映
-            const statusText = r.status === 'approved' ? '承認済' : (r.status === 'rejected' ? '断り済み' : '確認中');
+            // ステータス表記: pendingを「未承認」に変更
+            const statusText = r.status === 'approved' ? '承認済' : (r.status === 'rejected' ? '断り済み' : '未承認');
             tbody.innerHTML += `<tr>
                 <td>${r.customerName}</td><td>${r.carModel}</td><td>${r.carNumber}</td><td>${r.menu}</td><td>${r.datetime}</td>
-                <td>${statusText}</td>
+                <td class="fw-bold">${statusText}</td>
                 <td><input type="text" id="reason-${r.id}" value="${r.rejectReason || ''}" class="form-control form-control-sm"></td>
                 <td>
                     ${r.status !== 'approved' ? `<button class="btn btn-sm btn-success" onclick="process('${r.id}', 'approve')">承認</button>` : ''}
@@ -92,7 +92,6 @@
             body: JSON.stringify({ id, message: msg })
         });
         
-        alert("処理完了、LINE通知済みです");
         loadAll();
     }
     loadAll();
