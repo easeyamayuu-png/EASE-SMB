@@ -2,7 +2,6 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EASE-SMB 入庫管理ボード</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -11,9 +10,7 @@
         .day-row { display: flex; align-items: stretch; border-bottom: 1px solid #dee2e6; }
         .day-label { width: 110px; background: #f8f9fa; border-right: 2px solid #dee2e6; font-weight: bold; text-align: center; padding: 10px; }
         .timeline-board-horizontal { display: flex; flex: 1; overflow-x: auto; }
-        .timeline-column { width: 40px; border-right: 1px solid #eee; text-align: center; font-size: 0.6rem; }
-        .timeline-slots-horizontal { min-height: 50px; cursor: pointer; border-bottom: 1px solid #eee; }
-        .reservation-card { background: #fff3cd; border-left: 2px solid #ffc107; padding: 2px; font-size: 0.6rem; }
+        .reservation-card { background: #fff3cd; border-left: 2px solid #ffc107; padding: 2px; font-size: 0.6rem; margin: 2px; }
         .card-approved { background: #d1e7dd !important; border-left-color: #198754 !important; }
     </style>
 </head>
@@ -23,60 +20,59 @@
         <div class="card p-3 mb-4" id="timeline-3days-container"></div>
         <h6 class="fw-bold">📋 予約データ一覧</h6>
         <div class="card p-3"><table class="table table-sm table-hover align-middle">
-            <thead class="table-light"><tr><th>お客様名</th><th>車種</th><th>番号</th><th>メニュー</th><th>日時</th><th>状況</th><th>理由</th><th>アクション</th></tr></thead>
+            <thead class="table-light"><tr><th>お客様名</th><th>車種</th><th>番号</th><th>メニュー</th><th>日時</th><th>状況</th><th>お断り理由</th><th>アクション</th></tr></thead>
             <tbody id="reservation-list"></tbody>
         </table></div>
     </div>
 
     <script>
-        // 3日間分を生成
-        function initTimeline() {
-            const container = document.getElementById('timeline-3days-container');
-            const dates = [0, 1, 2].map(i => {
-                const d = new Date(); d.setDate(d.getDate() + i);
-                return d.toISOString().split('T')[0];
-            });
-            
-            container.innerHTML = dates.map(date => `
-                <div class="day-row">
-                    <div class="day-label">${date}</div>
-                    <div class="timeline-board-horizontal" id="row-${date}"></div>
-                </div>
-            `).join('');
-        }
-
         async function loadReservations() {
-            initTimeline();
             const res = await fetch('/api/reservations');
             const data = await res.json();
             const tbody = document.getElementById('reservation-list');
+            const container = document.getElementById('timeline-3days-container');
             tbody.innerHTML = '';
             
+            // タイムライン描画
+            const dates = [...new Set(data.map(r => r.datetime.split(' ')[0]))].sort();
+            container.innerHTML = dates.map(date => `
+                <div class="day-row"><div class="day-label">${date}</div><div class="timeline-board-horizontal" id="row-${date}"></div></div>
+            `).join('');
+
             data.forEach(r => {
-                // テーブル
+                // テーブル行
                 tbody.innerHTML += `<tr>
                     <td>${r.customerName}</td><td>${r.carModel}</td><td>${r.carNumber}</td><td>${r.menu}</td><td>${r.datetime}</td>
                     <td>${r.status === 'approved' ? '承認済' : '確認中'}</td>
                     <td><input type="text" id="reason-${r.id}" value="${r.rejectReason || ''}" class="form-control form-control-sm"></td>
                     <td>
-                        ${r.status !== 'approved' ? `<button class="btn btn-sm btn-success" onclick="approve('${r.id}')">承認</button>` : ''}
-                        <button class="btn btn-sm btn-danger" onclick="reject('${r.id}')">断る</button>
+                        <button class="btn btn-sm btn-success" onclick="approve('${r.id}')">承認</button>
+                        <button class="btn btn-sm btn-danger" onclick="reject('${r.id}')">却下</button>
                     </td>
                 </tr>`;
-
+                
                 // ボード配置
-                const [date, time] = r.datetime.split(' ');
-                const row = document.getElementById(`row-${date}`);
-                if(row) {
-                    row.innerHTML += `<div class="reservation-card ${r.status==='approved'?'card-approved':''}">${r.customerName}</div>`;
-                }
+                const row = document.getElementById(`row-${r.datetime.split(' ')[0]}`);
+                if(row) row.innerHTML += `<div class="reservation-card ${r.status==='approved'?'card-approved':''}">${r.customerName}</div>`;
             });
         }
-        async function approve(id) { await fetch(`/api/reservations/${id}/approve`, {method:'PATCH'}); loadReservations(); }
+
+        async function approve(id) { 
+            await fetch(`/api/reservations/${id}/approve`, {method:'PATCH'}); 
+            // LINE通知のトリガー
+            await fetch(`/api/notify-line`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, message: '予約が承認されました'})});
+            loadReservations(); 
+        }
+
         async function reject(id) { 
             const reason = document.getElementById(`reason-${id}`).value;
-            await fetch(`/api/reservations/${id}/reject`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rejectReason: reason})});
-            loadReservations();
+            await fetch(`/api/reservations/${id}/reject`, {
+                method:'PATCH', headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({rejectReason: reason})
+            });
+            // LINE通知のトリガー
+            await fetch(`/api/notify-line`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({id, message: '予約が却下されました: ' + reason})});
+            loadReservations(); 
         }
         loadReservations();
     </script>
