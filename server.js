@@ -29,13 +29,15 @@ const reservationSchema = new mongoose.Schema({
 
 const Reservation = mongoose.model('Reservation', reservationSchema);
 
-// 📥 API①：予約を申し込む
+// 📥 API①：予約を申し込む（フォーム / ボード共通）
 app.post('/api/reservations', async (req, res) => {
+    console.log("📥 新規予約の登録:", req.body);
     try {
         const newReservation = new Reservation(req.body);
         await newReservation.save();
         res.status(201).json(newReservation);
     } catch (error) {
+        console.error("❌ 保存エラー:", error);
         res.status(500).json({ error: '予約に失敗しました' });
     }
 });
@@ -60,23 +62,24 @@ app.get('/api/reservations', async (req, res) => {
     }
 });
 
-// 🟢 API③：予約を承認する
-app.use('/api/reservations/:id/approve', async (req, res) => {
+// 🟢 API③：予約を承認する (app.use → app.patch に修正)
+app.patch('/api/reservations/:id/approve', async (req, res) => {
     try {
         const reservation = await Reservation.findByIdAndUpdate(
             req.params.id, 
             { status: 'approved' }, 
             { new: true }
         );
-        console.log(`【LINE模擬送信】${reservation.customerName}様、入庫予約が確定しました！`);
+        console.log(`✅ 承認完了: ${reservation.customerName}様`);
         res.json(reservation);
     } catch (error) {
         res.status(500).json({ error: '承認処理に失敗しました' });
     }
 });
 
-// 🔴 API④：予約をお断りする
-app.use('/api/reservations/:id/reject', async (req, res) => {
+// 🔴 API④：予約をお断りする (app.use → app.patch に修正)
+app.patch('/api/reservations/:id/reject', async (req, res) => {
+    const { rejectReason } = req.body; //
     try {
         const { rejectReason } = req.body;
         const reservation = await Reservation.findByIdAndUpdate(
@@ -84,7 +87,7 @@ app.use('/api/reservations/:id/reject', async (req, res) => {
             { status: 'rejected', rejectReason: rejectReason || 'ピット満車のため' }, 
             { new: true }
         );
-        console.log(`【LINE模擬送信】${reservation.customerName}様、大変申し訳ありませんが、今回のご予約はお受けできません。理由: ${rejectReason}`);
+        console.log(`❌ お断り完了: ${reservation.customerName}様`);
         res.json(reservation);
     } catch (error) {
         res.status(500).json({ error: '拒否処理に失敗しました' });
