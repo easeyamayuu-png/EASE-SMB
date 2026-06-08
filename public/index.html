@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EASE-SMB 入庫管理・3連15分タイムライン</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f1f3f5; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.85rem; }
+        .navbar-brand { font-weight: bold; }
+        .card { border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-radius: 10px; }
+        .table th { background-color: #f8f9fa; }
+        
+        /* 📅 3日分のタイムラインをきれいに並べるコンテナ */
+        .day-timeline-container { background: white; border-radius: 8px; border: 1px solid #dee2e6; overflow: hidden; }
+        .day-row { display: flex; align-items: stretch; border-bottom: 1px solid #dee2e6; }
+        .day-row:last-child { border-bottom: none; }
+        
+        /* 左側の「日付ラベル」エリア */
+        .day-label { 
+            width: 110px; 
+            background-color: #f8f9fa; 
+            border-right: 2px solid #dee2e6; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            font-weight: bold; 
+            text-align: center;
+            padding: 5px;
+            color: #212529;
+        }
+        
+        /* 右側の「15分マス横一列」エリア */
+        .timeline-board-horizontal { display: flex; flex: 1; width: 100%; }
+        .timeline-column { flex: 1; min-width: 0; border-right: 1px solid #eee; display: flex; flex-direction: column; }
+        .timeline-column:last-child { border-right: none; }
+        
+        /* 時間ヘッダー（一番上の段だけ表示するのでスリム化） */
+        .timeline-hour-header { 
+            background-color: #e9ecef; 
+            font-weight: bold; 
+            text-align: center; 
+            padding: 2px 0; 
+            font-size: 0.55rem; 
+            border-bottom: 1px solid #dee2e6; 
+            color: #495057; 
+            line-height: 1.1;
+        }
+        
+        .timeline-slots-horizontal { 
+            padding: 3px 1px; 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 2px; 
+            min-height: 45px; /* 3段並べるため高さをコンパクトに */
+            background-color: #fff; 
+        }
+        
+        /* 🚗 超コンパクト予約チップ */
+        .reservation-card { 
+            background: #fff3cd; 
+            border-left: 2px solid #ffc107; 
+            padding: 1px 2px; 
+            border-radius: 2px; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
+            font-size: 0.55rem; 
+            line-height: 1.1;
+            word-break: break-all; 
+        }
+        .card-approved { background: #d1e7dd !important; border-left-color: #198754 !important; color: #0f5132; }
+        
+        .empty-text { font-size: 0.5rem; color: #f0f0f0; text-align: center; margin: auto 0; }
+        .date-btn { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid px-4">
+            <span class="navbar-brand mb-0 h1">🚗 EASE-SMB 入庫管理 & 3連高密度ボード</span>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 my-3">
+        
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="fw-bold text-secondary mb-0">📅 3日間スケジュール（9:00 〜 18:00 ※15分刻み）</h6>
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-outline-dark btn-sm date-btn" onclick="moveDate(-1)">◀ 前日</button>
+                <input type="date" id="base-date" class="form-control form-control-sm fw-bold text-center" style="width: 140px;">
+                <button class="btn btn-outline-dark btn-sm date-btn" onclick="moveDate(1)">翌日 ▶</button>
+            </div>
+        </div>
+
+        <div class="card p-2 mb-4">
+            <div class="day-timeline-container" id="timeline-3days-container">
+                </div>
+        </div>
+
+        <h6 class="mb-2 fw-bold text-secondary">📋 予約データ一覧（⚠️未承認タスク最優先表示中）</h6>
+        <div class="card p-3">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle" style="font-size: 0.8rem;">
+                    <thead>
+                        <tr>
+                            <th>お客様名</th>
+                            <th>車種</th>
+                            <th>車両番号</th>
+                            <th>ご希望メニュー</th>
+                            <th>入庫日時</th>
+                            <th>ステータス</th>
+                            <th>お断り理由入力 (任意)</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reservation-list"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 💡 基準日の初期設定（今日）
+        const today = new Date();
+        document.getElementById('base-date').value = formatDateString(today);
+
+        // カレンダーの日付を手動で変えたときも連動
+        document.getElementById('base-date').addEventListener('change', loadReservations);
+
+        // 矢印ボタン（◀ / ▶）を押したときの移動処理
+        function moveDate(days) {
+            const currentBoxValue = document.getElementById('base-date').value;
+            const d = new Date(currentBoxValue);
+            d.setDate(d.getDate() + days);
+            document.getElementById('base-date').value = formatDateString(d);
+            loadReservations();
+        }
+
+        // Dateオブジェクトを "YYYY-MM-DD" に変換する便利関数
+        function formatDateString(dateObj) {
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        // 15分刻みの時間リスト（9:00〜18:00）
+        const operatingHours = [];
+        for (let h = 9; h <= 18; h++) {
+            const hourStr = String(h).padStart(2, '0');
+            operatingHours.push(`${hourStr}:00`);
+            if (h !== 18) {
+                operatingHours.push(`${hourStr}:15`);
+                operatingHours.push(`${hourStr}:30`);
+                operatingHours.push(`${hourStr}:45`);
+            }
+        }
+        
+        // 💡 3日分のボード（段）を画面に出力する
+        function initTimeline3Days(dateStrings) {
+            const container = document.getElementById('timeline-3days-container');
+            container.innerHTML = '';
+
+            dateStrings.forEach((dateStr, index) => {
+                const displayDate = dateStr.substring(5); // "06-07" の形式にする
+                let rowHtml = `
+                    <div class="day-row">
+                        <div class="day-label">
+                            <span style="font-size:0.85rem;">${displayDate}</span>
+                            <span class="badge bg-secondary style="font-size:0.6rem;">${index===0 ? '基準日': index===1 ? '明日': '明後日'}</span>
+                        </div>
+                        <div class="timeline-board-horizontal">
+                `;
+
+                // 15分刻みの列を埋め込んでいく
+                operatingHours.forEach(hour => {
+                    const hourId = hour.replace(':', '-');
+                    const displayLabel = hour.endsWith(':00') ? hour : hour.split(':')[1];
+                    
+                    rowHtml += `
+                        <div class="timeline-column">
+                            ${index === 0 ? `<div class="timeline-hour-header">${displayLabel}</div>` : ''}
+                            <div class="timeline-slots-horizontal" id="slot-${dateStr}-${hourId}">
+                                <span class="empty-text" id="empty-${dateStr}-${hourId}">-</span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                rowHtml += `</div></div>`;
+                container.innerHTML += rowHtml;
+            });
+        }
+
+        async function loadReservations() {
+            // 💡 基準日から数えて3日分の日付文字列配列をつくる
+            const baseDateStr = document.getElementById('base-date').value;
+            const d0 = new Date(baseDateStr);
+            const d1 = new Date(baseDateStr); d1.setDate(d0.getDate() + 1);
+            const d2 = new Date(baseDateStr); d2.setDate(d0.getDate() + 2);
+            
+            const targetDates = [formatDateString(d0), formatDateString(d1), formatDateString(d2)];
+            
+            // 3日分の土台を生成
+            initTimeline3Days(targetDates);
+
+            try {
+                const response = await fetch('/api/reservations');
+                let reservations = await response.json();
+                
+                // 未承認タスク最優先ソート
+                reservations.sort((a, b) => {
+                    if (a.status === 'pending' && b.status !== 'pending') return -1;
+                    if (a.status !== 'pending' && b.status === 'pending') return 1;
+                    return 0;
+                });
+
+                const tbody = document.getElementById('reservation-list');
+                tbody.innerHTML = '';
+
+                reservations.forEach(r => {
+                    // ------------ ① リスト表示処理 ------------
+                    let statusBadge = '<span class="badge bg-warning text-dark">未承認</span>';
+                    if (r.status === 'approved') statusBadge = '<span class="badge bg-success">承認</span>';
+                    if (r.status === 'rejected') statusBadge = '<span class="badge bg-danger">お断り</span>';
+
+                    let reasonInput = '';
+                    let actionButtons = '';
+
+                    if (r.status === 'pending') {
+                        reasonInput = `<input type="text" id="reason-${r.id}" class="form-control form-control-sm" style="font-size:0.75rem; padding: 1px 5px;" placeholder="理由">`;
+                        actionButtons = `
+                            <button class="btn btn-success btn-sm fw-bold py-0 px-1" style="font-size:0.7rem;" onclick="approveAndSend('${r.id}')">承認</button>
+                            <button class="btn btn-danger btn-sm fw-bold py-0 px-1" style="font-size:0.7rem;" onclick="rejectAndSend('${r.id}')">断る</button>
+                        `;
+                    } else {
+                        reasonInput = `<span class="text-muted small">${r.rejectReason || '---'}</span>`;
+                        actionButtons = '<button class="btn btn-secondary btn-sm py-0 px-1" style="font-size:0.7rem;" disabled>済</button>';
+                    }
+
+                    const row = `
+                        <tr>
+                            <td><strong>${r.customerName}</strong> 様</td>
+                            <td>${r.carModel}</td>
+                            <td>${r.carNumber}</td>
+                            <td><span class="badge bg-info text-dark">${r.menu || '未指定'}</span></td>
+                            <td>${r.datetime}</td>
+                            <td>${statusBadge}</td>
+                            <td>${reasonInput}</td>
+                            <td>${actionButtons}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+
+                    // ------------ ② 🕒 3日分マッピング処理 ------------
+                    if (r.status === 'rejected') return; 
+
+                    if(r.datetime && r.datetime.includes(' ')) {
+                        const parts = r.datetime.split(' '); 
+                        const datePart = parts[0]; // "2026-06-07"
+                        const timePart = parts[1]; // "14:15"
+                        
+                        // 💡 データの予約日が、表示している「3日間のどれか」に含まれているかチェック
+                        if (!targetDates.includes(datePart)) return;
+
+                        const timeSegments = timePart.split(':');
+                        const hourId = `${timeSegments[0]}-${timeSegments[1]}`; 
+                        
+                        // 日付情報もIDに組み込んでピンポイントでマスを特定する
+                        const slotContainer = document.getElementById(`slot-${datePart}-${hourId}`);
+                        if(slotContainer) {
+                            const emptyLabel = document.getElementById(`empty-${datePart}-${hourId}`);
+                            if(emptyLabel) emptyLabel.remove();
+
+                            let cardClass = "";
+                            let statusText = "⚠️";
+                            if(r.status === 'approved') { cardClass = "card-approved"; statusText = "✅"; }
+
+                            const cardHtml = `
+                                <div class="reservation-card ${cardClass}" title="${r.customerName}様 (${r.menu})【${datePart} ${timePart}】">
+                                    <strong>${statusText}</strong>${r.customerName.substring(0,2)}..<br>
+                                    <span style="font-size:0.5rem; opacity: 0.8;">${r.carModel.substring(0,3)}</span>
+                                </div>
+                            `;
+                            slotContainer.innerHTML += cardHtml;
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('データ取得失敗:', error);
+            }
+        }
+
+        // 🟢 承認
+        async function approveAndSend(id) {
+            if(!confirm('この入庫予約を承認し、お客様へLINE通知を送信しますか？')) return;
+            try {
+                const response = await fetch(`/api/reservations/${id}/approve`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) { alert('🎉 承認完了！'); loadReservations(); } 
+                else { alert('❌ エラーが発生しました'); }
+            } catch (error) { console.error(error); }
+        }
+
+        // 🔴 お断り
+        async function rejectAndSend(id) {
+            const reasonInputValue = document.getElementById(`reason-${id}`).value;
+            if(!confirm('この入庫予約をお断りし、お客様へお詫びLINEを送信しますか？')) return;
+            try {
+                const response = await fetch(`/api/reservations/${id}/reject`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rejectReason: reasonInputValue })
+                });
+                if (response.ok) { alert('📁 お断り完了！'); loadReservations(); } 
+                else { alert('❌ エラーが発生しました'); }
+            } catch (error) { console.error(error); }
+        }
+
+        loadReservations();
+    </script>
+</body>
+</html>

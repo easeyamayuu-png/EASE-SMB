@@ -1,0 +1,66 @@
+[
+  {
+    "id": "1780817359515",
+    "customerName": "山本　優太",
+    "carModel": "エスクァイア",
+    "carNumber": "鳥取530す679",
+    "menu": "オイル交換",
+    "datetime": "2026-06-08 09:45",
+    "status": "pending"
+  },
+  {
+    "id": "1780817212593",
+    "customerName": "山本　優太",
+    "carModel": "エスクァイア",
+    "carNumber": "鳥取530す679",
+    "menu": "車検見積り",
+    "datetime": "2026-06-09 17:15",
+    "status": "pending"
+  },
+  {
+    "id": "1780816981213",
+    "customerName": "ゆう",
+    "carModel": "エスクァイア",
+    "carNumber": "鳥取530す679",
+    "menu": "オイル交換",
+    "datetime": "2026-06-07 18:15",
+    "status": "approved"
+  },
+  {
+    "id": "1780816402841",
+    "customerName": "山本　優太",
+    "carModel": "エスクァイア",
+    "carNumber": "鳥取530す679",
+    "menu": "12ヶ月点検",
+    "datetime": "2026-06-09 16:13",
+    "status": "approved"
+  },
+  {
+    "id": "1",
+    "customerName": "トヨタ 太郎",
+    "carModel": "プリウス",
+    "carNumber": "東京 500 わ 12-34",
+    "menu": "12ヶ月点検",
+    "status": "rejected",
+    "datetime": "2026-06-06 10:00"
+  },
+  {
+    "id": "2",
+    "customerName": "日産 次郎",
+    "carModel": "セレナ",
+    "carNumber": "横浜 300 な 56-78",
+    "menu": "オイル交換",
+    "status": "rejected",
+    "datetime": "2026-06-07 13:00",
+    "rejectReason": "定休日の為"
+  },
+  {
+    "id": "3",
+    "customerName": "ホンダ 三郎",
+    "carModel": "N-BOX",
+    "carNumber": "大宮 580 ほ 90-12",
+    "menu": "車検見積り",
+    "status": "approved",
+    "datetime": "2026-06-08 15:30"
+  }
+]
