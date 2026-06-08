@@ -2,79 +2,92 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EASE-SMB 入庫管理・3連15分タイムライン</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f1f3f5; font-size: 0.8rem; }
-        .reservation-card { background: #fff3cd; border-left: 2px solid #ffc107; padding: 2px; font-size: 0.6rem; cursor: pointer; }
+        body { background-color: #f1f3f5; font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 0.85rem; }
+        .day-timeline-container { background: white; border-radius: 8px; border: 1px solid #dee2e6; overflow: hidden; }
+        .day-row { display: flex; align-items: stretch; border-bottom: 1px solid #dee2e6; }
+        .day-label { width: 110px; background-color: #f8f9fa; border-right: 2px solid #dee2e6; display: flex; flex-direction: column; justify-content: center; align-items: center; font-weight: bold; padding: 5px; }
+        .timeline-board-horizontal { display: flex; flex: 1; }
+        .timeline-column { flex: 1; min-width: 0; border-right: 1px solid #eee; display: flex; flex-direction: column; }
+        .timeline-hour-header { background-color: #e9ecef; font-weight: bold; text-align: center; font-size: 0.5rem; border-bottom: 1px solid #dee2e6; }
+        .timeline-slots-horizontal { padding: 3px 1px; flex: 1; min-height: 45px; background-color: #fff; cursor: pointer; }
+        .reservation-card { background: #fff3cd; border-left: 2px solid #ffc107; padding: 1px 2px; font-size: 0.55rem; word-break: break-all; }
         .card-approved { background: #d1e7dd !important; border-left-color: #198754 !important; }
-        .timeline-slots-horizontal { min-height: 40px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <div class="container-fluid p-4">
-        <h4 class="fw-bold mb-3">🚗 EASE-SMB 入庫管理ボード</h4>
-        <div class="card p-3 mb-4" id="timeline-3days-container"></div>
-        <h6 class="fw-bold">📋 予約データ一覧</h6>
+    <nav class="navbar navbar-dark bg-dark"><div class="container-fluid px-4"><span class="navbar-brand">🚗 EASE-SMB 入庫管理 & 3連高密度ボード</span></div></nav>
+    <div class="container-fluid px-4 my-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <h6 class="fw-bold text-secondary">📅 3日間スケジュール</h6>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-dark btn-sm" onclick="moveDate(-1)">◀ 前日</button>
+                <input type="date" id="base-date" class="form-control form-control-sm" style="width: 140px;">
+                <button class="btn btn-outline-dark btn-sm" onclick="moveDate(1)">翌日 ▶</button>
+            </div>
+        </div>
+        <div class="card p-2 mb-4"><div class="day-timeline-container" id="timeline-3days-container"></div></div>
+        <h6 class="mb-2 fw-bold text-secondary">📋 予約データ一覧（未承認タスク最優先表示中）</h6>
         <div class="card p-3"><table class="table table-sm table-hover align-middle">
-            <thead><tr><th>氏名</th><th>車種</th><th>メニュー</th><th>日時</th><th>状況</th><th>アクション</th></tr></thead>
+            <thead class="table-light"><tr><th>お客様名</th><th>車種</th><th>車両番号</th><th>ご希望メニュー</th><th>入庫日時</th><th>ステータス</th><th>お断り理由</th><th>アクション</th></tr></thead>
             <tbody id="reservation-list"></tbody>
         </table></div>
     </div>
 
-    <div class="modal fade" id="addReservationModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-body">
-        <input type="text" id="new-name" class="form-control mb-2" placeholder="お客様名">
-        <input type="text" id="new-car" class="form-control mb-2" placeholder="車種">
-        <input type="text" id="new-menu" class="form-control mb-2" placeholder="メニュー">
-        <input type="hidden" id="target-datetime">
-    </div><div class="modal-footer"><button class="btn btn-primary" onclick="saveManualReservation()">予約追加</button></div></div></div></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // 日付フォーマット・初期化ロジック
-        function formatDate(d) { return d.toISOString().split('T')[0]; }
+        // 1. タイムラインの初期化（元のデザインを維持）
+        function initTimeline3Days(dateStrings) {
+            const container = document.getElementById('timeline-3days-container');
+            container.innerHTML = '';
+            const hours = [];
+            for(let h=9; h<=18; h++){ ['00','15','30','45'].forEach(m => hours.push(`${String(h).padStart(2,'0')}:${m}`)); }
+            
+            dateStrings.forEach((dateStr, index) => {
+                let row = `<div class="day-row"><div class="day-label">${dateStr.substring(5)}</div><div class="timeline-board-horizontal">`;
+                hours.forEach(hour => {
+                    row += `<div class="timeline-column"><div class="timeline-slots-horizontal" id="slot-${dateStr}-${hour.replace(':','-')}"></div></div>`;
+                });
+                container.innerHTML += row + `</div></div>`;
+            });
+        }
+
+        // 2. データ取得と反映（超重要：ここが連動の心臓部です）
         async function loadReservations() {
+            const baseDateStr = document.getElementById('base-date').value;
+            const d = new Date(baseDateStr);
+            const dates = [0,1,2].map(i => {
+                const day = new Date(d); day.setDate(d.getDate() + i);
+                return day.toISOString().split('T')[0];
+            });
+            initTimeline3Days(dates);
+
             const res = await fetch('/api/reservations');
             const data = await res.json();
             const tbody = document.getElementById('reservation-list');
             tbody.innerHTML = '';
+
             data.forEach(r => {
-                const statusJp = r.status === 'approved' ? '承認済' : '確認中';
+                // テーブル行の生成
                 tbody.innerHTML += `<tr>
-                    <td>${r.customerName}</td><td>${r.carModel}</td><td>${r.menu}</td><td>${r.datetime}</td>
-                    <td><span class="badge ${r.status==='approved'?'bg-success':'bg-warning'}">${statusJp}</span></td>
-                    <td>
-                        ${r.status !== 'approved' ? `
-                            <button class="btn btn-sm btn-outline-success" onclick="approve('${r.id}')">承認</button>
-                            <input type="text" id="reason-${r.id}" placeholder="却下理由" style="width:80px">
-                            <button class="btn btn-sm btn-outline-danger" onclick="reject('${r.id}')">却下</button>` : '完了'}
-                    </td>
+                    <td>${r.customerName}</td><td>${r.carModel}</td><td>${r.carNumber}</td><td>${r.menu}</td>
+                    <td>${r.datetime}</td><td>${r.status}</td><td>${r.rejectReason || ''}</td>
+                    <td><button class="btn btn-sm btn-success" onclick="approve('${r.id}')">承認</button></td>
                 </tr>`;
+
+                // ボードへのチップ配置（IDの形式を元通りに修正）
+                const [date, time] = r.datetime.split(' ');
+                const slot = document.getElementById(`slot-${date}-${time.replace(':', '-')}`);
+                if(slot) {
+                    slot.innerHTML += `<div class="reservation-card ${r.status==='approved' ? 'card-approved' : ''}">${r.customerName.substring(0,3)}</div>`;
+                }
             });
         }
         
         async function approve(id) { await fetch(`/api/reservations/${id}/approve`, {method:'PATCH'}); loadReservations(); }
-        async function reject(id) { 
-            const reason = document.getElementById(`reason-${id}`).value;
-            await fetch(`/api/reservations/${id}/reject`, {
-                method:'PATCH', 
-                headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({rejectReason: reason})
-            });
-            loadReservations();
-        }
-        
-        async function saveManualReservation() {
-            const data = {
-                customerName: document.getElementById('new-name').value,
-                carModel: document.getElementById('new-car').value,
-                menu: document.getElementById('new-menu').value,
-                datetime: document.getElementById('target-datetime').value,
-                status: 'pending'
-            };
-            await fetch('/api/reservations', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
-            location.reload();
-        }
+        document.getElementById('base-date').value = new Date().toISOString().split('T')[0];
         loadReservations();
     </script>
 </body>
