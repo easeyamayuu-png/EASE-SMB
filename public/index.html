@@ -130,40 +130,7 @@
     }
 
     // ✅ 対応完了ボタンを押したときの処理
-    async function completeTask(id) {
-        if(!id || id === 'undefined') {
-            alert("エラー: データのIDが正しく取得できませんでした。");
-            return;
-        }
-
-        const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
-        
-        try {
-            // 1. サーバーのステータスを更新 (中身は従来のapproveルートを再利用して完了扱いにします)
-            const updateRes = await fetch(`/api/reservations/${id}/approve`, {
-                method: 'PATCH',
-                headers: {'Content-Type': 'application/json'}
-            });
-            
-            if(!updateRes.ok) throw new Error('サーバー側のステータス更新に失敗しました。');
-
-            // 2. LINE通知の送信
-            const lineRes = await fetch(`/api/notify-line`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: id, message: msg })
-            });
-
-            if(!lineRes.ok) console.warn('LINE通知の送信に失敗しましたが、ステータスは更新されました。');
-            
-            // 再読み込み
-            loadAll();
-            
-        } catch (error) {
-            console.error('処理エラー:', error);
-            alert('処理中にエラーが発生しました。コンソールログを確認してください。');
-        }
-    }
+    https://manager.line.biz/account/@912ntfos
 
     // 初回読み込み
     loadAll();
