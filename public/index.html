@@ -8,37 +8,39 @@
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-        body { background-color: #f4f6f9; font-size: 0.85rem; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        body { background-color: #f4f6f9; font-size: 0.8rem; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; }
         
-        .task-card { background: white; border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #fd7e14; animation: pulse-border 2s infinite; }
-        .task-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        .task-card { background: white; border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; border-left: 5px solid #fd7e14; animation: pulse-border 2s infinite; }
+        .task-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         @keyframes pulse-border { 0% { border-left-color: #fd7e14; } 50% { border-left-color: #ffc107; } 100% { border-left-color: #fd7e14; } }
         
-        .timeline-container { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .timeline-header-row { display: flex; background: #343a40; color: white; border-radius: 6px 6px 0 0; font-weight: bold; align-items: center; }
-        .timeline-row { display: flex; border-bottom: 1px solid #e9ecef; height: 55px; align-items: center; position: relative; }
-        .day-label { width: 110px; font-weight: 700; background: #e9ecef; text-align: center; height: 100%; display: flex; align-items: center; justify-content: center; border-right: 2px solid #dee2e6; color: #495057; z-index: 20; }
+        .timeline-container { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); overflow-x: hidden; }
+        .timeline-header-row { display: flex; background: #343a40; color: white; border-radius: 4px 4px 0 0; font-weight: bold; align-items: center; }
+        .timeline-row { display: flex; border-bottom: 1px solid #e9ecef; height: 45px; align-items: center; position: relative; }
+        
+        /* 💡 日付ラベル枠の中に「＋」ボタンが入るよう縦並び・幅100pxに調整 */
+        .day-label { width: 100px; font-weight: 700; background: #e9ecef; text-align: center; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px solid #dee2e6; color: #495057; z-index: 20; font-size: 0.75rem; gap: 2px; }
         .slots-wrapper { display: flex; height: 100%; flex-grow: 1; position: relative; }
-        .slot-cell { width: 45px; height: 100%; border-right: 1px solid #edf2f7; }
+        .slot-cell { width: 30px; height: 100%; border-right: 1px solid #edf2f7; }
         
         .reservation-chip { 
-            position: absolute; top: 6px; height: 42px; background: #e1f5fe; border: 1px solid #03a9f4; color: #0288d1; 
-            font-size: 0.7rem; padding: 2px 8px; border-radius: 6px; overflow: hidden; text-overflow: ellipsis; 
-            white-space: nowrap; font-weight: bold; z-index: 10; box-shadow: 0 2px 4px rgba(3,169,244,0.2); touch-action: none; user-select: none;
+            position: absolute; top: 6px; height: 32px; background: #e1f5fe; border: 1px solid #03a9f4; color: #0288d1; 
+            font-size: 0.65rem; padding: 2px 4px; border-radius: 4px; overflow: hidden; text-overflow: ellipsis; 
+            white-space: nowrap; font-weight: bold; z-index: 10; box-shadow: 0 1px 3px rgba(3,169,244,0.15); touch-action: none; user-select: none;
+            line-height: 26px;
         }
         .reservation-chip:not(.chip-moving) { cursor: grab; }
-        .chip-moving { cursor: grabbing; opacity: 0.8; z-index: 100 !important; box-shadow: 0 8px 16px rgba(0,0,0,0.15); }
+        .chip-moving { cursor: grabbing; opacity: 0.8; z-index: 100 !important; box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .chip-done { background: #e8f5e9 !important; border-color: #4caf50 !important; color: #2e7d32 !important; box-shadow: none !important; }
         
-        .time-head { width: 180px; text-align: center; font-size: 0.75rem; background: #495057; border-right: 1px solid #6c757d; padding: 4px 0; }
-        .date-nav-btn { background: #fff; border: 1px solid #ced4da; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .time-head { width: 120px; text-align: center; font-size: 0.7rem; background: #495057; border-right: 1px solid #6c757d; padding: 2px 0; }
+        .date-nav-btn { background: #fff; border: 1px solid #ced4da; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
         .date-nav-btn:hover { background: #e9ecef; border-color: #adb5bd; }
 
-        .admin-table-card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: none; overflow: hidden; }
-        .admin-table th { background: #212529; color: white; font-weight: bold; }
-        .admin-table td { vertical-align: middle; }
+        .admin-table-card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: none; overflow: hidden; }
+        .admin-table th { background: #212529; color: white; font-weight: bold; padding: 6px 8px; }
+        .admin-table td { vertical-align: middle; padding: 6px 8px; }
 
-        /* 💡 断り済み予約用のブラックアウトデザイン */
         .row-rejected { background-color: #2b2d31 !important; color: #8a8d93 !important; transition: all 0.3s; }
         .row-rejected td { color: #8a8d93 !important; border-color: #3f4147 !important; }
         .row-rejected .badge { background-color: #4f5157 !important; color: #bbb !important; }
@@ -46,42 +48,42 @@
     </style>
 </head>
 <body>
-<div class="container-fluid p-4">
+<div class="container-fluid p-3">
     
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h3 class="fw-bold m-0 text-dark"><i class="bi bi-speedometer2 text-primary me-2"></i>EASE-SMB 高機能入庫管理システム</h3>
-        <span class="badge bg-dark px-3 py-2 fs-6" id="clock">2026-06-09</span>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="fw-bold m-0 text-dark"><i class="bi bi-speedometer2 text-primary me-2"></i>EASE-SMB 高機能入庫管理システム</h4>
+        <span class="badge bg-dark px-3 py-2 fs-6" id="clock">2026-06-10</span>
     </div>
 
-    <h5 class="fw-bold text-danger mb-3"><i class="bi bi-bell-fill text-warning me-2"></i>⚡ 要対応の新規案件（LINE未返信）</h5>
-    <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-3 mb-5"></div>
+    <h6 class="fw-bold text-danger mb-2"><i class="bi bi-bell-fill text-warning me-2"></i>⚡ 要対応の新規案件（LINE未返信）</h6>
+    <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-2 mb-4"></div>
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況</h5>
-        <div class="d-flex align-items-center gap-2">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況</h6>
+        <div class="d-flex align-items-center gap-1">
             <button class="date-nav-btn" onclick="moveDate(-4)"><i class="bi bi-chevron-left"></i> 前の4日間</button>
             <button class="date-nav-btn" onclick="resetToToday()">今日に戻る</button>
             <button class="date-nav-btn" onclick="moveDate(4)">次の4日間 <i class="bi bi-chevron-right"></i></button>
         </div>
     </div>
 
-    <div class="timeline-container mb-5">
+    <div class="timeline-container mb-4">
         <div class="timeline-header-row mb-1">
-            <div style="width: 110px;" class="text-center py-2">日付</div>
+            <div style="width: 100px;" class="text-center py-1">日付</div>
             <div class="d-flex flex-grow-1">
                 <div class="time-head">9:00</div><div class="time-head">10:00</div><div class="time-head">11:00</div>
                 <div class="time-head">12:00</div><div class="time-head">13:00</div><div class="time-head">14:00</div>
                 <div class="time-head">15:00</div><div class="time-head">16:00</div><div class="time-head">17:00</div>
-                <div class="time-head">18:00</div>
+                <div class="time-head" style="border-right:none; width: 120px;">18:00</div>
             </div>
         </div>
         <div id="timeline-rows-box"></div>
     </div>
 
-    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理（断り済みは自動で下部に集約）</h5>
-    <div class="card admin-table-card p-3 mb-4">
+    <h6 class="fw-bold text-secondary mb-2"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理（断り済みは自動で下部に集約）</h6>
+    <div class="card admin-table-card p-2 mb-3">
         <div class="table-responsive">
-            <table class="table table-hover admin-table mb-0">
+            <table class="table table-sm table-hover admin-table mb-0">
                 <thead>
                     <tr>
                         <th>氏名</th>
@@ -91,7 +93,7 @@
                         <th>日時</th>
                         <th>状況</th>
                         <th>断り理由</th>
-                        <th style="width: 180px;">アクション</th>
+                        <th style="width: 160px;">アクション</th>
                     </tr>
                 </thead>
                 <tbody id="admin-table-body"></tbody>
@@ -100,16 +102,58 @@
     </div>
 </div>
 
-<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-            <div class="modal-header bg-dark text-white" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
-                <h5 class="modal-title fw-bold" id="detailModalLabel"><i class="bi bi-file-earmark-text me-2"></i>予約内容の確認</h5>
+        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            <div class="modal-header bg-primary text-white" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                <h6 class="modal-title fw-bold" id="createModalLabel"><i class="bi bi-calendar-plus me-2"></i>管理者手動：新規予約の配置</h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4" id="modal-detail-content"></div>
+            <div class="modal-body p-3">
+                <form id="manual-reservation-form">
+                    <input type="hidden" id="form-target-date">
+                    <div class="mb-2">
+                        <label class="form-label fw-bold mb-1">お客様氏名</label>
+                        <input type="text" id="form-customer-name" class="form-control form-control-sm" placeholder="山田 太郎" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold mb-1">車種</label>
+                        <input type="text" id="form-car-model" class="form-control form-control-sm" placeholder="プリウス" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold mb-1">車両番号（任意）</label>
+                        <input type="text" id="form-car-number" class="form-control form-control-sm" placeholder="鳥取530す679">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold mb-1">作業メニュー</label>
+                        <select id="form-menu" class="form-select form-select-sm">
+                            <option value="オイル交換">オイル交換 (15分)</option>
+                            <option value="車検見積り">車検見積り (30分)</option>
+                            <option value="12ヶ月点検">12ヶ月点検 (2時間)</option>
+                            <option value="一般整備">一般整備 (30分)</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label fw-bold mb-1">開始時間</label>
+                        <select id="form-time" class="form-select form-select-sm"></select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2"><i class="bi bi-plus-circle me-1"></i> タイムラインに配置する</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            <div class="modal-header bg-dark text-white" style="border-top-left-radius: 12px; border-top-right-radius: 12px;">
+                <h6 class="modal-title fw-bold" id="detailModalLabel"><i class="bi bi-file-earmark-text me-2"></i>予約内容の確認</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3" id="modal-detail-content"></div>
             <div class="modal-footer" style="border-top: 1px solid #efefef;">
-                <button type="button" class="btn btn-secondary fw-bold rounded-pill px-4" data-bs-dismiss="modal">閉じる</button>
+                <button type="button" class="btn btn-secondary btn-sm fw-bold rounded-pill px-3" data-bs-dismiss="modal">閉じる</button>
             </div>
         </div>
     </div>
@@ -118,11 +162,20 @@
 <script>
     const hours = Array.from({length: 10}, (_, i) => i + 9);
     const mins = ['00', '15', '30', '45'];
-    const CELL_WIDTH = 45; 
+    const CELL_WIDTH = 30; 
 
-    const TODAY_STR = '2026-06-09';
+    const TODAY_STR = '2026-06-10';
     let currentStartDate = new Date(TODAY_STR);
     let allReservations = []; 
+
+    // 手動フォーム用の時間選択肢を生成
+    const timeSelect = document.getElementById('form-time');
+    hours.forEach(h => {
+        mins.forEach(m => {
+            const t = `${String(h).padStart(2,'0')}:${m}`;
+            timeSelect.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+    });
 
     function formatDate(date) {
         const y = date.getFullYear();
@@ -182,6 +235,48 @@
         }
     }
 
+    // 💡 変更箇所②：新規登録用のポップアップを呼び出す処理
+    function openCreateModal(dateStr) {
+        document.getElementById('form-target-date').value = dateStr;
+        document.getElementById('manual-reservation-form').reset();
+        const createModal = new bootstrap.Modal(document.getElementById('createModal'));
+        createModal.show();
+    }
+
+    // 💡 変更箇所③：フォーム送信時に直接サーバーに登録して配置する
+    document.getElementById('manual-reservation-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const date = document.getElementById('form-target-date').value;
+        const time = document.getElementById('form-time').value;
+        const menu = document.getElementById('form-menu').value;
+        
+        const payload = {
+            customerName: document.getElementById('form-customer-name').value,
+            carModel: document.getElementById('form-car-model').value,
+            carNumber: document.getElementById('form-car-number').value,
+            menu: menu,
+            datetime: `${date} ${time}`,
+            slotsNeeded: getSlotCount(menu),
+            status: 'approved' // 管理者直接なので最初から承認済(確定)で配置
+        };
+
+        try {
+            const res = await fetch('/api/reservations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if(!res.ok) throw new Error('手動登録失敗');
+            
+            // モーダルを閉じてデータを再読み込み
+            bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
+            loadAll();
+        } catch (err) {
+            console.error(err);
+            alert('登録に失敗しました。');
+        }
+    });
+
     function renderScreen() {
         const tasksContainer = document.getElementById('pending-tasks-container');
         const rowsBox = document.getElementById('timeline-rows-box');
@@ -193,9 +288,15 @@
 
         const displayDates = getDisplayDates();
 
+        // 💡 変更箇所④：各日の左側に「＋ 新規配置」ボタンを実装
         rowsBox.innerHTML = displayDates.map(date => `
             <div class="timeline-row" data-date="${date}">
-                <div class="day-label">${date.slice(5)}</div>
+                <div class="day-label">
+                    <div>${date.slice(5)}</div>
+                    <button class="btn btn-primary py-0 px-1" style="font-size:0.6rem; border-radius:10px;" onclick="openCreateModal('${date}')">
+                        <i class="bi bi-plus-circle"></i> 新規配置
+                    </button>
+                </div>
                 <div class="slots-wrapper">
                     ${hours.map(h => mins.map(m => `<div class="slot-cell"></div>`).join('')).join('')}
                 </div>
@@ -204,7 +305,6 @@
 
         let hasPending = false;
         
-        // 💡 データを並び替え（通常の予約を上に、却下(rejected)された予約を下に落とす）
         const sortedReservations = [...allReservations].sort((a, b) => {
             if (a.status === 'rejected' && b.status !== 'rejected') return 1;
             if (a.status !== 'rejected' && b.status === 'rejected') return -1;
@@ -215,12 +315,11 @@
             const recordId = r._id ? r._id.toString() : (r.id ? r.id.toString() : '');
             const [d, t] = r.datetime.split(' ');
             
-            // 💡 翌日自動消去ロジック
             if (r.status === 'rejected' && d < TODAY_STR) {
                 return; 
             }
 
-            // 1. タイムラインへの配置 (却下は表示しない)
+            // 1. タイムラインへの配置
             if (displayDates.includes(d) && r.status !== 'rejected') {
                 const rowEl = document.querySelector(`.timeline-row[data-date="${d}"] .slots-wrapper`);
                 if(rowEl) {
@@ -229,7 +328,7 @@
                     const slotsNeeded = r.slotsNeeded || getSlotCount(r.menu);
                     
                     const leftPos = startIdx * CELL_WIDTH;
-                    const chipWidth = (slotsNeeded * CELL_WIDTH) - 4;
+                    const chipWidth = (slotsNeeded * CELL_WIDTH) - 3;
 
                     const chip = document.createElement('div');
                     chip.className = `reservation-chip ${isDone ? 'chip-done' : ''}`;
@@ -251,18 +350,18 @@
                 hasPending = true;
                 tasksContainer.innerHTML += `
                     <div class="col">
-                        <div class="card task-card p-3">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h5 class="fw-bold text-dark m-0"><i class="bi bi-person-circle text-secondary me-1"></i> ${r.customerName} 様</h5>
-                                <span class="badge bg-warning text-dark">未対応</span>
+                        <div class="card task-card p-2">
+                            <div class="d-flex justify-content-between align-items-start mb-1">
+                                <h6 class="fw-bold text-dark m-0"><i class="bi bi-person-circle text-secondary me-1"></i> ${r.customerName} 様</h6>
+                                <span class="badge bg-warning text-dark" style="font-size:0.65rem;">未対応</span>
                             </div>
-                            <div class="text-muted mb-2" style="font-size: 0.8rem;">
+                            <div class="text-muted mb-1" style="font-size: 0.75rem;">
                                 <div><i class="bi bi-car-front me-1"></i> ${r.carModel} (${r.carNumber || '番号なし'})</div>
                                 <div><i class="bi bi-wrench me-1"></i> <strong class="text-primary">${r.menu}</strong></div>
                                 <div><i class="bi bi-clock me-1"></i> ${r.datetime}</div>
                             </div>
-                            <button class="btn btn-success btn-sm w-100 fw-bold mb-1" onclick="completeTask('${recordId}')">
-                                <i class="bi bi-check2-circle me-1"></i> 対応完了 (LINEに確定通知)
+                            <button class="btn btn-success btn-sm w-100 fw-bold py-0" style="font-size:0.7rem;" onclick="completeTask('${recordId}')">
+                                <i class="bi bi-check2-circle me-1"></i> 対応完了 (LINE通知)
                             </button>
                         </div>
                     </div>
@@ -270,12 +369,12 @@
             }
 
             // 3. 管理テーブルの組み立て
-            let statusBadge = `<span class="badge bg-warning text-dark">未対応</span>`;
+            let statusBadge = `<span class="badge bg-warning text-dark" style="font-size:0.65rem;">未対応</span>`;
             let rowClass = "";
-            if (r.status === 'approved') statusBadge = `<span class="badge bg-success">承認済</span>`;
+            if (r.status === 'approved') statusBadge = `<span class="badge bg-success" style="font-size:0.65rem;">承認済</span>`;
             
             if (r.status === 'rejected') {
-                statusBadge = `<span class="badge bg-danger">断り済み</span>`;
+                statusBadge = `<span class="badge bg-danger" style="font-size:0.65rem;">断り済み</span>`;
                 rowClass = "row-rejected";
             }
 
@@ -287,14 +386,12 @@
                     <td>${r.menu}</td>
                     <td>${r.datetime}</td>
                     <td>${statusBadge}</td>
-                    <td><input type="text" class="form-control form-control-sm" value="${r.rejectReason || ''}" style="width:120px;" disabled></td>
+                    <td><input type="text" class="form-control form-control-sm py-0" value="${r.rejectReason || ''}" style="width:110px; font-size:0.7rem;" disabled></td>
                     <td>
                         <div class="d-flex gap-1">
-                            <button class="btn btn-info btn-sm text-white fw-bold" onclick="showDetail('${recordId}')">
-                                <i class="bi bi-file-earmark-text"></i> 確認
-                            </button>
-                            <button class="btn btn-danger btn-sm fw-bold" onclick="rejectTask('${recordId}')" ${r.status==='rejected'?'disabled':''}>却下</button>
-                            <button class="btn btn-success btn-sm fw-bold" onclick="completeTask('${recordId}')" ${r.status==='approved'?'disabled':''}>承認</button>
+                            <button class="btn btn-info btn-sm text-white fw-bold py-0 px-1" style="font-size:0.7rem;" onclick="showDetail('${recordId}')">確認</button>
+                            <button class="btn btn-danger btn-sm fw-bold py-0 px-1" style="font-size:0.7rem;" onclick="rejectTask('${recordId}')" ${r.status==='rejected'?'disabled':''}>却下</button>
+                            <button class="btn btn-success btn-sm fw-bold py-0 px-1" style="font-size:0.7rem;" onclick="completeTask('${recordId}')" ${r.status==='approved'?'disabled':''}>承認</button>
                         </div>
                     </td>
                 </tr>
@@ -302,7 +399,7 @@
         });
 
         if (!hasPending) {
-            tasksContainer.innerHTML = `<div class="w-100 text-center py-4 text-muted fs-5"><i class="bi bi-emoji-smile text-success me-2"></i>現在、未対応の新規案件はありません。ばっちりです！</div>`;
+            tasksContainer.innerHTML = `<div class="w-100 text-center py-2 text-muted" style="font-size:0.85rem;"><i class="bi bi-emoji-smile text-success me-2"></i>現在、未対応の新規案件はありません。ばっちりです！</div>`;
         }
     }
 
@@ -311,7 +408,7 @@
         if (!r) { alert('データが見つかりませんでした。'); return; }
         const modalBody = document.getElementById('modal-detail-content');
         modalBody.innerHTML = `
-            <table class="table table-bordered m-0" style="font-size: 0.9rem;">
+            <table class="table table-sm table-bordered m-0" style="font-size: 0.8rem;">
                 <tr><th class="bg-light" style="width: 35%;">お客様名</th><td class="fw-bold">${r.customerName} 様</td></tr>
                 <tr><th class="bg-light">車種</th><td>${r.carModel}</td></tr>
                 <tr><th class="bg-light">車両番号</th><td>${r.carNumber || '（未登録）'}</td></tr>
@@ -319,7 +416,6 @@
                 <tr><th class="bg-light">予約日時</th><td class="fw-bold">${r.datetime}</td></tr>
                 <tr><th class="bg-light">現在のステータス</th><td>${r.status === 'approved' ? '🟢 承認・確定済み' : (r.status === 'rejected' ? '🔴 却下・断り済み' : '🟡 未対応（要確認）')}</td></tr>
                 <tr><th class="bg-light">お断り理由</th><td>${r.rejectReason || '（なし）'}</td></tr>
-                <tr><th class="bg-light">LINEユーザーID</th><td><small class="text-muted" style="word-break: break-all;">${r.lineUserId || r.userId || '（Web直受付などIDなし）'}</small></td></tr>
             </table>
         `;
         const myModal = new bootstrap.Modal(document.getElementById('detailModal'));
@@ -347,7 +443,7 @@
             const target = event.target;
             let width = event.rect.width;
             if (width < CELL_WIDTH) width = CELL_WIDTH;
-            target.style.width = `${width - 4}px`;
+            target.style.width = `${width - 3}px`;
             const slots = Math.round(width / CELL_WIDTH);
             target.setAttribute('data-slots', slots);
         },
@@ -385,62 +481,36 @@
         }
     }
 
-    // 💡 承認完了処理（即時リロード連動を強化）
     async function completeTask(id) {
         if(!id) return;
         const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
         try {
             const updateRes = await fetch(`/api/reservations/${id}/approve`, { method: 'PATCH', headers: {'Content-Type': 'application/json'} });
             if(!updateRes.ok) throw new Error('サーバー更新失敗');
-            
-            // LINE通知
             await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
-            
-            // 画面の配列内ステータスを即時書き換えて再描画
             const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
             if(found) found.status = 'approved';
-            
             window.open('https://manager.line.biz/account/@912ntfos', '_blank');
-            renderScreen(); // 💡 確実に画面を即時書き換え
-        } catch (error) { 
-            console.error(error); 
-            alert('処理中にエラーが発生しました。'); 
-        }
+            renderScreen();
+        } catch (error) { console.error(error); alert('処理中にエラーが発生しました。'); }
     }
 
-    // 💡 却下処理（即時ブラックアウト＆下部移動を100%保証）
     async function rejectTask(id) {
         if(!id) return;
         const reason = prompt("お断りの理由を入力してください（お客様のLINEに通知されます）", "ピット満車のため");
-        if(reason === null) return; // キャンセルされたら何もしない
-        
+        if(reason === null) return;
         const msg = `❌ 【EASE-SMB】大変申し訳ございません。\n以下の理由によりご予約を承ることができませんでした。\n\n理由: ${reason}`;
         try {
-            // 1. サーバーのデータを却下に書き換える
-            const res = await fetch(`/api/reservations/${id}/reject`, { 
-                method: 'PATCH', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ rejectReason: reason }) 
-            });
-            if(!res.ok) throw new Error('却下APIの通信に失敗しました。');
-
-            // 2. LINE通知
+            const res = await fetch(`/api/reservations/${id}/reject`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ rejectReason: reason }) });
+            if(!res.ok) throw new Error('API失敗');
             await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
-            
-            // 3. 💡 フロント側のデータ配列をその場で上書きして、通信ラグなしで即時画面に反映させる
             const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
             if(found) {
                 found.status = 'rejected';
                 found.rejectReason = reason;
             }
-            
-            // 4. 即座に再描画（これで一瞬でタイムラインから消え、テーブルの最下部でブラックアウトします）
             renderScreen();
-            
-        } catch (error) { 
-            console.error(error); 
-            alert('却下処理の反映に失敗しました。サーバー側のルートを確認してください。'); 
-        }
+        } catch (error) { console.error(error); alert('却下処理の反映に失敗しました。'); }
     }
 
     loadAll();
