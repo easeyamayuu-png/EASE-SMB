@@ -5,48 +5,47 @@
     <title>EASE-SMB 入庫管理タスクボード</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
     <style>
         body { background-color: #f4f6f9; font-size: 0.85rem; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; }
         
-        /* タスクカードのデザイン */
         .task-card { background: white; border: none; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; border-left: 5px solid #fd7e14; animation: pulse-border 2s infinite; }
         .task-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
         @keyframes pulse-border { 0% { border-left-color: #fd7e14; } 50% { border-left-color: #ffc107; } 100% { border-left-color: #fd7e14; } }
         
-        /* タイムラインのデザイン */
         .timeline-container { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .timeline-header-row { display: flex; background: #343a40; color: white; border-radius: 6px 6px 0 0; font-weight: bold; align-items: center; }
-        .timeline-row { display: flex; border-bottom: 1px solid #e9ecef; height: 55px; align-items: center; transition: background 0.1s; }
-        .timeline-row:hover { background: #f8f9fa; }
-        .day-label { width: 110px; font-weight: 700; background: #e9ecef; text-align: center; height: 100%; display: flex; align-items: center; justify-content: center; border-right: 2px solid #dee2e6; color: #495057; }
-        .slot-cell { width: 45px; height: 100%; border-right: 1px solid #edf2f7; position: relative; display: flex; align-items: center; justify-content: center; }
+        .timeline-row { display: flex; border-bottom: 1px solid #e9ecef; height: 55px; align-items: center; position: relative; }
+        .day-label { width: 110px; font-weight: 700; background: #e9ecef; text-align: center; height: 100%; display: flex; align-items: center; justify-content: center; border-right: 2px solid #dee2e6; color: #495057; z-index: 20; }
+        .slots-wrapper { display: flex; height: 100%; flex-grow: 1; position: relative; }
+        .slot-cell { width: 45px; height: 100%; border-right: 1px solid #edf2f7; }
         
-        /* タイムライン内の予約チップ（メニュー可変幅対応） */
+        /* タイムライン内の予約チップ */
         .reservation-chip { 
             position: absolute; 
-            top: 4px; 
-            left: 2px; 
-            bottom: 4px; 
+            top: 6px; 
+            height: 42px;
             background: #e1f5fe; 
             border: 1px solid #03a9f4; 
             color: #0288d1; 
             font-size: 0.7rem; 
-            padding: 2px 4px; 
+            padding: 2px 8px; 
             border-radius: 6px; 
             overflow: hidden; 
             text-overflow: ellipsis; 
             white-space: nowrap; 
             font-weight: bold; 
-            text-align: left; 
             z-index: 10; 
             box-shadow: 0 2px 4px rgba(3,169,244,0.2);
+            touch-action: none;
+            user-select: none;
         }
-        .chip-done { background: #e8f5e9 !important; border-color: #4caf50 !important; color: #2e7d32 !important; box-shadow: none !important; opacity: 0.85; }
+        /* 💡 マウスを乗せたときに動かせることを伝えるカーソル表記 */
+        .reservation-chip:not(.chip-moving) { cursor: grab; }
+        .chip-moving { cursor: grabbing; opacity: 0.8; z-index: 100 !important; box-shadow: 0 8px 16px rgba(0,0,0,0.15); }
+        .chip-done { background: #e8f5e9 !important; border-color: #4caf50 !important; color: #2e7d32 !important; box-shadow: none !important; }
         
-        /* 時間軸のヘッダー用の幅微調整 */
         .time-head { width: 180px; text-align: center; font-size: 0.75rem; background: #495057; border-right: 1px solid #6c757d; padding: 4px 0; }
-        
-        /* 日付ナビゲーション */
         .date-nav-btn { background: #fff; border: 1px solid #ced4da; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
         .date-nav-btn:hover { background: #e9ecef; border-color: #adb5bd; }
     </style>
@@ -63,7 +62,7 @@
     <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-3 mb-5"></div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況（可変幅タイムライン）</h5>
+        <h5 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況（ドラッグ移動＆長さ調整対応）</h5>
         <div class="d-flex align-items-center gap-2">
             <button class="date-nav-btn" onclick="moveDate(-4)"><i class="bi bi-chevron-left"></i> 前の4日間</button>
             <button class="date-nav-btn" onclick="resetToToday()">今日に戻る</button>
@@ -88,9 +87,10 @@
 <script>
     const hours = Array.from({length: 10}, (_, i) => i + 9);
     const mins = ['00', '15', '30', '45'];
-    const CELL_WIDTH = 45; // 1マスの幅(px) CSSの.slot-cellのwidthと合わせる
+    const CELL_WIDTH = 45; // 1マスの幅(px)
 
     let currentStartDate = new Date('2026-06-09');
+    let allReservations = []; // データを保持するグローバル配列
 
     function formatDate(date) {
         const y = date.getFullYear();
@@ -111,27 +111,44 @@
 
     function moveDate(days) {
         currentStartDate.setDate(currentStartDate.getDate() + days);
-        loadAll();
+        renderScreen();
     }
 
     function resetToToday() {
         currentStartDate = new Date('2026-06-09');
-        loadAll();
+        renderScreen();
     }
 
-    // 💡 メニューに応じた「占有マス数」を返す関数
     function getSlotCount(menu) {
-        if (!menu) return 2; // 不明な場合は30分(2マス)
-        if (menu.includes('オイル')) return 1;    // 15分
-        if (menu.includes('車検見積')) return 2;  // 30分
-        if (menu.includes('12ヶ月') || menu.includes('点検')) return 8; // 2時間(8マス)
-        return 2; // デフォルト30分(2マス)
+        if (!menu) return 2;
+        if (menu.includes('オイル')) return 1;
+        if (menu.includes('車検見積')) return 2;
+        if (menu.includes('12ヶ月') || menu.includes('点検')) return 8;
+        return 2;
+    }
+
+    // 時間文字列から「何マス目か」のインデックスを計算する (9:00が0番目)
+    function timeToLeftIndex(timeStr) {
+        const [h, m] = timeStr.split(':').map(Number);
+        const totalMins = (h - 9) * 60 + m;
+        return Math.floor(totalMins / 15);
+    }
+
+    // マス目インデックスから時間文字列に変える (0 -> "09:00")
+    function leftIndexToTime(index) {
+        const totalMins = index * 15;
+        const h = 9 + Math.floor(totalMins / 60);
+        const m = totalMins % 60;
+        return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     }
 
     async function loadAll() {
         const res = await fetch('/api/reservations');
-        const data = await res.json();
-        
+        allReservations = await res.json();
+        renderScreen();
+    }
+
+    function renderScreen() {
         const tasksContainer = document.getElementById('pending-tasks-container');
         const rowsBox = document.getElementById('timeline-rows-box');
         
@@ -139,39 +156,46 @@
         rowsBox.innerHTML = '';
 
         const displayDates = getDisplayDates();
+
+        // 各行にマスのコンテナを配置
         rowsBox.innerHTML = displayDates.map(date => `
-            <div class="timeline-row">
+            <div class="timeline-row" data-date="${date}">
                 <div class="day-label">${date.slice(5)}</div>
-                <div class="d-flex h-100">
-                    ${hours.map(h => mins.map(m => `<div class="slot-cell" id="slot-${date}-${String(h).padStart(2,'0')}-${m}"></div>`).join('')).join('')}
+                <div class="slots-wrapper">
+                    ${hours.map(h => mins.map(m => `<div class="slot-cell"></div>`).join('')).join('')}
                 </div>
             </div>
         `).join('');
 
         let hasPending = false;
         
-        data.forEach(r => {
+        allReservations.forEach(r => {
             const recordId = r.id || r._id; 
             const [d, t] = r.datetime.split(' ');
-            const [h, m] = t.split(':');
             
+            // タイムラインへの配置（絶対配置を使って滑らかに動かせるように変更）
             if (displayDates.includes(d)) {
-                const slotId = `slot-${d}-${String(h).padStart(2,'0')}-${m}`;
-                const slot = document.getElementById(slotId);
-                if(slot) {
+                const rowEl = document.querySelector(`.timeline-row[data-date="${d}"] .slots-wrapper`);
+                if(rowEl) {
                     const isDone = r.status === 'approved';
+                    const startIdx = timeToLeftIndex(t);
+                    const slotsNeeded = r.slotsNeeded || getSlotCount(r.menu);
                     
-                    // 💡 可変幅の計算処理
-                    const slotsNeeded = getSlotCount(r.menu);
-                    // マス数 × 1マス幅 から、左右の余白分(4px)を引いてピッタリ合わせる
-                    const chipWidth = (slotsNeeded * CELL_WIDTH) - 4; 
+                    const leftPos = startIdx * CELL_WIDTH;
+                    const chipWidth = (slotsNeeded * CELL_WIDTH) - 4;
 
-                    slot.innerHTML = `
-                        <div class="reservation-chip ${isDone ? 'chip-done' : ''}" 
-                             style="width: ${chipWidth}px;" 
-                             title="${r.customerName}様 / ${r.menu} (${slotsNeeded * 15}分)">
-                             ${r.customerName}様 (${r.menu})
-                        </div>`;
+                    const chip = document.createElement('div');
+                    chip.className = `reservation-chip ${isDone ? 'chip-done' : ''}`;
+                    chip.style.left = `${leftPos}px`;
+                    chip.style.width = `${chipWidth}px`;
+                    chip.setAttribute('data-id', recordId);
+                    chip.setAttribute('data-x', leftPos);
+                    chip.setAttribute('data-slots', slotsNeeded);
+                    chip.setAttribute('data-date', d);
+                    chip.title = `${r.customerName}様 / ${r.menu}`;
+                    chip.innerText = `${r.customerName}様 (${r.menu})`;
+                    
+                    rowEl.appendChild(chip);
                 }
             }
 
@@ -203,34 +227,121 @@
         }
     }
 
+    // 💡 Interact.js を使ったドラッグ＆リサイズ処理のセットアップ
+    interact('.reservation-chip').draggable({
+        origin: 'self',
+        inertia: false,
+        modifiers: [
+            interact.modifiers.snap({
+                targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ], // 1マス刻みにスナップ
+                range: Infinity,
+                relativePoints: [ { x: 0, y: 0 } ]
+            })
+        ],
+        autoScroll: true,
+        onstart(event) {
+            event.target.classList.add('chip-moving');
+        },
+        onmove(event) {
+            const target = event.target;
+            let x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
+            
+            // 表示エリアからはみ出さない制限
+            if (x < 0) x = 0;
+            
+            target.style.left = `${x}px`;
+            target.setAttribute('data-x', x);
+        },
+        onend(event) {
+            event.target.classList.remove('chip-moving');
+            saveDraggedChange(event.target);
+        }
+    }).resizable({
+        edges: { left: false, right: true, bottom: false, top: false }, // 右端だけ引っ張れる
+        modifiers: [
+            interact.modifiers.snapSize({
+                targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ],
+                range: Infinity
+            })
+        ],
+        inertia: false,
+        onmove(event) {
+            const target = event.target;
+            let width = event.rect.width;
+            
+            if (width < CELL_WIDTH) width = CELL_WIDTH; // 最低1マス
+            target.style.width = `${width - 4}px`;
+            
+            const slots = Math.round(width / CELL_WIDTH);
+            target.setAttribute('data-slots', slots);
+        },
+        onend(event) {
+            saveDraggedChange(event.target);
+        }
+    });
+
+    // 💡 操作が終わったあとにデータをデータベースへ自動保存する関数
+    async function saveDraggedChange(target) {
+        const id = target.getAttribute('data-id');
+        const x = parseFloat(target.getAttribute('data-x')) || 0;
+        const slots = parseInt(target.getAttribute('data-slots')) || 1;
+        const date = target.getAttribute('data-date');
+        
+        const newIdx = Math.round(x / CELL_WIDTH);
+        const newTime = leftIndexToTime(newIdx);
+        const newDatetime = `${date} ${newTime}`;
+
+        try {
+            // サーバーのデータベースをPATCHで更新
+            const response = await fetch(`/api/reservations/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    datetime: newDatetime,
+                    slotsNeeded: slots // 新しい占有マス数も保存
+                })
+            });
+            if (!response.ok) throw new Error('時間の保存に失敗しました');
+            
+            // グローバル配列内のデータを直接書き換えてリフレッシュ
+            const found = allReservations.find(r => (r.id || r._id) === id);
+            if(found) {
+                found.datetime = newDatetime;
+                found.slotsNeeded = slots;
+            }
+            renderScreen();
+        } catch (err) {
+            console.error(err);
+            alert('通信エラーにより、変更した時間が保存できませんでした。');
+            loadAll(); // 元の形に戻す
+        }
+    }
+
+    // 対応完了処理
     async function completeTask(id) {
         if(!id || id === 'undefined') {
             alert("エラー: データのIDが正しく取得できませんでした。");
             return;
         }
-
         const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
-        
         try {
             const updateRes = await fetch(`/api/reservations/${id}/approve`, {
                 method: 'PATCH',
                 headers: {'Content-Type': 'application/json'}
             });
-            if(!updateRes.ok) throw new Error('サーバー側のステータス更新に失敗しました。');
+            if(!updateRes.ok) throw new Error('サーバー更新失敗');
 
-            const lineRes = await fetch(`/api/notify-line`, {
+            await fetch(`/api/notify-line`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ id: id, message: msg })
             });
-            if(!lineRes.ok) console.warn('LINE通知の送信に失敗しました。');
             
             window.open('https://manager.line.biz/account/@912ntfos', '_blank');
             loadAll();
-            
         } catch (error) {
-            console.error('処理エラー:', error);
-            alert('処理中にエラーが発生しました。コンソールを確認してください。');
+            console.error(error);
+            alert('処理中にエラーが発生しました。');
         }
     }
 
