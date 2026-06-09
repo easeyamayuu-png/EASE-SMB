@@ -16,18 +16,20 @@ mongoose.connect(mongoURI)
     .then(() => console.log('🍃 MongoDBに無事接続されました！'))
     .catch(err => console.error('❌ DB接続エラー:', err));
 
+// 📝 スキーム定義（ドラッグ幅保存用に slotsNeeded もスキーマに追加しました）
 const reservationSchema = new mongoose.Schema({
     customerName: String,
     carModel: String,
     carNumber: String,
     menu: String,
     datetime: String,
+    slotsNeeded: { type: Number, default: 2 },
     status: { type: String, default: 'pending' },
     rejectReason: { type: String, default: '' }
 });
 const Reservation = mongoose.model('Reservation', reservationSchema);
 
-// 📥 API①：新規予約の受付（※これが欠落していたため追加しました）
+// 📥 API①：新規予約の受付
 app.post('/api/reservations', async (req, res) => {
     try {
         const newRes = new Reservation(req.body);
@@ -39,7 +41,7 @@ app.post('/api/reservations', async (req, res) => {
     }
 });
 
-// 🔔 API②：LINE通知（※既に定義済みですが整理しました）
+// 🔔 API②：LINE通知
 app.post('/api/notify-line', async (req, res) => {
     const { id, message } = req.body;
     try {
@@ -51,6 +53,9 @@ app.post('/api/notify-line', async (req, res) => {
             },
             body: JSON.stringify({
                 to: process.env.LINE_USER_ID,
+                messages: [{ type: 'text', text: message }]
+            } || {
+                to: req.body.lineUserId || process.env.LINE_USER_ID, // ユーザー宛に送る場合はここを柔軟に変更可能です
                 messages: [{ type: 'text', text: message }]
             })
         });
@@ -68,20 +73,53 @@ app.get('/api/reservations', async (req, res) => {
     res.json(reservations);
 });
 
-// 🟢 API④：承認
+// 🟢 API④：承認 (確定)
 app.patch('/api/reservations/:id/approve', async (req, res) => {
-    const reservation = await Reservation.findByIdAndUpdate(req.params.id, { status: 'approved' }, { new: true });
-    res.json(reservation);
+    try {
+        const reservation = await Reservation.findByIdAndUpdate(
+            req.params.id, 
+            { status: 'approved' }, 
+            { new: true }
+        );
+        res.json(reservation);
+    } catch (error) {
+        console.error('承認エラー:', error);
+        res.status(500).json({ error: '承認処理に失敗しました。' });
+    }
 });
 
-// 🔴 API⑤：却下
+// 🔴 API⑤：却下 (URLを修正し、お断り理由を保存できるように直しました)
+app.patch('/api/reservations/:id/reject', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rejectReason } = req.body; // HTML側から送られてくる理由を取得
+        
+        const updatedReservation = await Reservation.findByIdAndUpdate(
+            id,
+            { 
+                status: 'rejected', 
+                rejectReason: rejectReason || 'ピット満車のため' 
+            },
+            { new: true }
+        );
+
+        if (!updatedReservation) {
+            return res.status(404).json({ error: '該当する予約が見つかりません。' });
+        }
+
+        res.json({ success: true, data: updatedReservation });
+    } catch (error) {
+        console.error('サーバー側での予約却下エラー:', error);
+        res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
+    }
+});
+
+// 🔄 API⑥：ドラッグ＆ドロップによる日時・スロット（コマ数）の変更保存
 app.patch('/api/reservations/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { datetime, slotsNeeded } = req.body;
         
-        // 【重要】お使いのデータベース(MongoDB / Nedb / PostgreSQLなど)に合わせて書き換えてください。
-        // 以下は、MongoDB (Mongoose) を使用している場合の一般的な記述例です：
         const updatedReservation = await Reservation.findByIdAndUpdate(
             id,
             { datetime, slotsNeeded },
@@ -94,8 +132,9 @@ app.patch('/api/reservations/:id', async (req, res) => {
 
         res.json({ success: true, data: updatedReservation });
     } catch (error) {
-        console.error('サーバー側での予約更新エラー:', error);
+        console.error('サーバー側での予約ドラッグ更新エラー:', error);
         res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
     }
 });
+
 app.listen(PORT, () => console.log(`🚀 サーバー起動: ${PORT}`));
