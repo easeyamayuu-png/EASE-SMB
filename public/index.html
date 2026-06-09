@@ -22,23 +22,9 @@
         .slot-cell { width: 45px; height: 100%; border-right: 1px solid #edf2f7; }
         
         .reservation-chip { 
-            position: absolute; 
-            top: 6px; 
-            height: 42px;
-            background: #e1f5fe; 
-            border: 1px solid #03a9f4; 
-            color: #0288d1; 
-            font-size: 0.7rem; 
-            padding: 2px 8px; 
-            border-radius: 6px; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            white-space: nowrap; 
-            font-weight: bold; 
-            z-index: 10; 
-            box-shadow: 0 2px 4px rgba(3,169,244,0.2);
-            touch-action: none;
-            user-select: none;
+            position: absolute; top: 6px; height: 42px; background: #e1f5fe; border: 1px solid #03a9f4; color: #0288d1; 
+            font-size: 0.7rem; padding: 2px 8px; border-radius: 6px; overflow: hidden; text-overflow: ellipsis; 
+            white-space: nowrap; font-weight: bold; z-index: 10; box-shadow: 0 2px 4px rgba(3,169,244,0.2); touch-action: none; user-select: none;
         }
         .reservation-chip:not(.chip-moving) { cursor: grab; }
         .chip-moving { cursor: grabbing; opacity: 0.8; z-index: 100 !important; box-shadow: 0 8px 16px rgba(0,0,0,0.15); }
@@ -51,6 +37,12 @@
         .admin-table-card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: none; overflow: hidden; }
         .admin-table th { background: #212529; color: white; font-weight: bold; }
         .admin-table td { vertical-align: middle; }
+
+        /* 💡 断り済み予約用のブラックアウト（ダークデザイン）スタイル */
+        .row-rejected { background-color: #2b2d31 !important; color: #8a8d93 !important; transition: all 0.3s; }
+        .row-rejected td { color: #8a8d93 !important; border-color: #3f4147 !important; }
+        .row-rejected .badge { background-color: #4f5157 !important; color: #bbb !important; }
+        .row-rejected input { background-color: #383a40 !important; border-color: #4f5157 !important; color: #8a8d93 !important; }
     </style>
 </head>
 <body>
@@ -86,7 +78,7 @@
         <div id="timeline-rows-box"></div>
     </div>
 
-    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理（過去ログ・履歴）</h5>
+    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理（断り済みは自動で下部に集約）</h5>
     <div class="card admin-table-card p-3 mb-4">
         <div class="table-responsive">
             <table class="table table-hover admin-table mb-0">
@@ -123,13 +115,14 @@
     </div>
 </div>
 
-
 <script>
     const hours = Array.from({length: 10}, (_, i) => i + 9);
     const mins = ['00', '15', '30', '45'];
     const CELL_WIDTH = 45; 
 
-    let currentStartDate = new Date('2026-06-09');
+    // システム上の「今日」の基準日付
+    const TODAY_STR = '2026-06-09';
+    let currentStartDate = new Date(TODAY_STR);
     let allReservations = []; 
 
     function formatDate(date) {
@@ -155,7 +148,7 @@
     }
 
     function resetToToday() {
-        currentStartDate = new Date('2026-06-09');
+        currentStartDate = new Date(TODAY_STR);
         renderScreen();
     }
 
@@ -208,11 +201,23 @@
 
         let hasPending = false;
         
-        allReservations.forEach(r => {
+        // 💡 【パワーアップ】データを並び替え（通常の予約を上に、却下(rejected)された予約を下に落とす）
+        const sortedReservations = [...allReservations].sort((a, b) => {
+            if (a.status === 'rejected' && b.status !== 'rejected') return 1;
+            if (a.status !== 'rejected' && b.status === 'rejected') return -1;
+            return 0;
+        });
+
+        sortedReservations.forEach(r => {
             const recordId = r._id ? r._id.toString() : (r.id ? r.id.toString() : '');
             const [d, t] = r.datetime.split(' ');
             
-            // 💡 【修正ポイント】却下(rejected)された予約はタイムライン上には絶対に表示しない
+            // 💡 【翌日自動消去ロジック】 却下済み、かつ、日付が「今日(2026-06-09)」より前の過去データなら、これ以降の処理を完全にスキップ（消去）
+            if (r.status === 'rejected' && d < TODAY_STR) {
+                return; 
+            }
+
+            // 1. タイムラインへの配置 (却下は表示しない)
             if (displayDates.includes(d) && r.status !== 'rejected') {
                 const rowEl = document.querySelector(`.timeline-row[data-date="${d}"] .slots-wrapper`);
                 if(rowEl) {
@@ -238,6 +243,7 @@
                 }
             }
 
+            // 2. 未対応新規タスク
             if (r.status === 'pending') {
                 hasPending = true;
                 tasksContainer.innerHTML += `
@@ -260,20 +266,26 @@
                 `;
             }
 
+            // 3. 管理テーブルの組み立て
             let statusBadge = `<span class="badge bg-warning text-dark">未対応</span>`;
+            let rowClass = "";
             if (r.status === 'approved') statusBadge = `<span class="badge bg-success">承認済</span>`;
-            if (r.status === 'rejected') statusBadge = `<span class="badge bg-danger">断り済み</span>`;
+            
+            // 💡 却下済みの場合は、行全体に「row-rejected（ブラックアウト）」を適用
+            if (r.status === 'rejected') {
+                statusBadge = `<span class="badge bg-danger">断り済み</span>`;
+                rowClass = "row-rejected";
+            }
 
-            // 💡 下部の管理テーブルには「履歴」として却下データも残るので安心です
             tableBody.innerHTML += `
-                <tr>
+                <tr class="${rowClass}">
                     <td class="fw-bold">${r.customerName}</td>
                     <td>${r.carModel}</td>
                     <td>${r.carNumber || ' - '}</td>
                     <td>${r.menu}</td>
                     <td>${r.datetime}</td>
                     <td>${statusBadge}</td>
-                    <td><span class="text-danger style="font-size:0.75rem;">${r.rejectReason || ''}</span></td>
+                    <td><input type="text" class="form-control form-control-sm" value="${r.rejectReason || ''}" style="width:120px;" disabled></td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-info btn-sm text-white fw-bold" onclick="showDetail('${recordId}')">
