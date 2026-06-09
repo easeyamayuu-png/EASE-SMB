@@ -48,7 +48,6 @@
         .date-nav-btn { background: #fff; border: 1px solid #ced4da; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
         .date-nav-btn:hover { background: #e9ecef; border-color: #adb5bd; }
 
-        /* 管理テーブルの装飾 */
         .admin-table-card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: none; overflow: hidden; }
         .admin-table th { background: #212529; color: white; font-weight: bold; }
         .admin-table td { vertical-align: middle; }
@@ -87,7 +86,7 @@
         <div id="timeline-rows-box"></div>
     </div>
 
-    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理</h5>
+    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理（過去ログ・履歴）</h5>
     <div class="card admin-table-card p-3 mb-4">
         <div class="table-responsive">
             <table class="table table-hover admin-table mb-0">
@@ -103,8 +102,7 @@
                         <th style="width: 180px;">アクション</th>
                     </tr>
                 </thead>
-                <tbody id="admin-table-body">
-                    </tbody>
+                <tbody id="admin-table-body"></tbody>
             </table>
         </div>
     </div>
@@ -117,8 +115,7 @@
                 <h5 class="modal-title fw-bold" id="detailModalLabel"><i class="bi bi-file-earmark-text me-2"></i>予約内容の確認</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4" id="modal-detail-content">
-                </div>
+            <div class="modal-body p-4" id="modal-detail-content"></div>
             <div class="modal-footer" style="border-top: 1px solid #efefef;">
                 <button type="button" class="btn btn-secondary fw-bold rounded-pill px-4" data-bs-dismiss="modal">閉じる</button>
             </div>
@@ -196,11 +193,10 @@
         
         tasksContainer.innerHTML = '';
         rowsBox.innerHTML = '';
-        tableBody.innerHTML = ''; // テーブルも初期化
+        tableBody.innerHTML = ''; 
 
         const displayDates = getDisplayDates();
 
-        // タイムラインの土台生成
         rowsBox.innerHTML = displayDates.map(date => `
             <div class="timeline-row" data-date="${date}">
                 <div class="day-label">${date.slice(5)}</div>
@@ -213,12 +209,11 @@
         let hasPending = false;
         
         allReservations.forEach(r => {
-            // MongoDBの _id と通常の id 両方に完全対応するセーフティ設計
             const recordId = r._id ? r._id.toString() : (r.id ? r.id.toString() : '');
             const [d, t] = r.datetime.split(' ');
             
-            // 1. タイムラインへの配置
-            if (displayDates.includes(d)) {
+            // 💡 【修正ポイント】却下(rejected)された予約はタイムライン上には絶対に表示しない
+            if (displayDates.includes(d) && r.status !== 'rejected') {
                 const rowEl = document.querySelector(`.timeline-row[data-date="${d}"] .slots-wrapper`);
                 if(rowEl) {
                     const isDone = r.status === 'approved';
@@ -243,7 +238,6 @@
                 }
             }
 
-            // 2. 上部「未対応タスク」の生成
             if (r.status === 'pending') {
                 hasPending = true;
                 tasksContainer.innerHTML += `
@@ -266,11 +260,11 @@
                 `;
             }
 
-            // 3. 📋 下部「予約詳細・承認管理テーブル」の行を生成
             let statusBadge = `<span class="badge bg-warning text-dark">未対応</span>`;
             if (r.status === 'approved') statusBadge = `<span class="badge bg-success">承認済</span>`;
             if (r.status === 'rejected') statusBadge = `<span class="badge bg-danger">断り済み</span>`;
 
+            // 💡 下部の管理テーブルには「履歴」として却下データも残るので安心です
             tableBody.innerHTML += `
                 <tr>
                     <td class="fw-bold">${r.customerName}</td>
@@ -279,7 +273,7 @@
                     <td>${r.menu}</td>
                     <td>${r.datetime}</td>
                     <td>${statusBadge}</td>
-                    <td><input type="text" class="form-control form-control-sm" value="${r.rejectReason || ''}" style="width:100px;" disabled></td>
+                    <td><span class="text-danger style="font-size:0.75rem;">${r.rejectReason || ''}</span></td>
                     <td>
                         <div class="d-flex gap-1">
                             <button class="btn btn-info btn-sm text-white fw-bold" onclick="showDetail('${recordId}')">
@@ -298,16 +292,10 @@
         }
     }
 
-    // 💡 ボタンを押したときにポップアップを開いて内容を表示する関数
     function showDetail(id) {
         const r = allReservations.find(res => (res._id ? res._id.toString() : res.id.toString()) === id);
-        if (!r) {
-            alert('データが見つかりませんでした。');
-            return;
-        }
-
+        if (!r) { alert('データが見つかりませんでした。'); return; }
         const modalBody = document.getElementById('modal-detail-content');
-        // ポップアップの中身をリッチに構築
         modalBody.innerHTML = `
             <table class="table table-bordered m-0" style="font-size: 0.9rem;">
                 <tr><th class="bg-light" style="width: 35%;">お客様名</th><td class="fw-bold">${r.customerName} 様</td></tr>
@@ -320,13 +308,10 @@
                 <tr><th class="bg-light">LINEユーザーID</th><td><small class="text-muted" style="word-break: break-all;">${r.lineUserId || r.userId || '（Web直受付などIDなし）'}</small></td></tr>
             </table>
         `;
-
-        // Bootstrapの命令でモーダルをパッと開く
         const myModal = new bootstrap.Modal(document.getElementById('detailModal'));
         myModal.show();
     }
 
-    // Interact.js のドラッグ＆リサイズ処理
     interact('.reservation-chip').draggable({
         origin: 'self', inertia: false,
         modifiers: [ interact.modifiers.snap({ targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ], range: Infinity, relativePoints: [ { x: 0, y: 0 } ] }) ],
@@ -386,7 +371,6 @@
         }
     }
 
-    // 対応完了・承認処理
     async function completeTask(id) {
         if(!id) return;
         const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
@@ -399,7 +383,6 @@
         } catch (error) { console.error(error); alert('処理中にエラーが発生しました。'); }
     }
 
-    // 却下処理（スタブ）
     async function rejectTask(id) {
         if(!id) return;
         const reason = prompt("お断りの理由を入力してください（お客様のLINEに通知されます）", "ピット満車のため");
