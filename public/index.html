@@ -6,6 +6,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         body { background-color: #f4f6f9; font-size: 0.85rem; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; }
         
@@ -20,7 +21,6 @@
         .slots-wrapper { display: flex; height: 100%; flex-grow: 1; position: relative; }
         .slot-cell { width: 45px; height: 100%; border-right: 1px solid #edf2f7; }
         
-        /* タイムライン内の予約チップ */
         .reservation-chip { 
             position: absolute; 
             top: 6px; 
@@ -40,7 +40,6 @@
             touch-action: none;
             user-select: none;
         }
-        /* 💡 マウスを乗せたときに動かせることを伝えるカーソル表記 */
         .reservation-chip:not(.chip-moving) { cursor: grab; }
         .chip-moving { cursor: grabbing; opacity: 0.8; z-index: 100 !important; box-shadow: 0 8px 16px rgba(0,0,0,0.15); }
         .chip-done { background: #e8f5e9 !important; border-color: #4caf50 !important; color: #2e7d32 !important; box-shadow: none !important; }
@@ -48,6 +47,11 @@
         .time-head { width: 180px; text-align: center; font-size: 0.75rem; background: #495057; border-right: 1px solid #6c757d; padding: 4px 0; }
         .date-nav-btn { background: #fff; border: 1px solid #ced4da; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
         .date-nav-btn:hover { background: #e9ecef; border-color: #adb5bd; }
+
+        /* 管理テーブルの装飾 */
+        .admin-table-card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: none; overflow: hidden; }
+        .admin-table th { background: #212529; color: white; font-weight: bold; }
+        .admin-table td { vertical-align: middle; }
     </style>
 </head>
 <body>
@@ -62,7 +66,7 @@
     <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-3 mb-5"></div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況（ドラッグ移動＆長さ調整対応）</h5>
+        <h5 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況</h5>
         <div class="d-flex align-items-center gap-2">
             <button class="date-nav-btn" onclick="moveDate(-4)"><i class="bi bi-chevron-left"></i> 前の4日間</button>
             <button class="date-nav-btn" onclick="resetToToday()">今日に戻る</button>
@@ -70,7 +74,7 @@
         </div>
     </div>
 
-    <div class="timeline-container mb-4">
+    <div class="timeline-container mb-5">
         <div class="timeline-header-row mb-1">
             <div style="width: 110px;" class="text-center py-2">日付</div>
             <div class="d-flex flex-grow-1">
@@ -82,15 +86,54 @@
         </div>
         <div id="timeline-rows-box"></div>
     </div>
+
+    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-clipboard-data text-primary me-2"></i>📋 予約詳細・承認管理</h5>
+    <div class="card admin-table-card p-3 mb-4">
+        <div class="table-responsive">
+            <table class="table table-hover admin-table mb-0">
+                <thead>
+                    <tr>
+                        <th>氏名</th>
+                        <th>車種</th>
+                        <th>番号</th>
+                        <th>メニュー</th>
+                        <th>日時</th>
+                        <th>状況</th>
+                        <th>断り理由</th>
+                        <th style="width: 180px;">アクション</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-table-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
 </div>
+
+<div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 16px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+            <div class="modal-header bg-dark text-white" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
+                <h5 class="modal-title fw-bold" id="detailModalLabel"><i class="bi bi-file-earmark-text me-2"></i>予約内容の確認</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="modal-detail-content">
+                </div>
+            <div class="modal-footer" style="border-top: 1px solid #efefef;">
+                <button type="button" class="btn btn-secondary fw-bold rounded-pill px-4" data-bs-dismiss="modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 <script>
     const hours = Array.from({length: 10}, (_, i) => i + 9);
     const mins = ['00', '15', '30', '45'];
-    const CELL_WIDTH = 45; // 1マスの幅(px)
+    const CELL_WIDTH = 45; 
 
     let currentStartDate = new Date('2026-06-09');
-    let allReservations = []; // データを保持するグローバル配列
+    let allReservations = []; 
 
     function formatDate(date) {
         const y = date.getFullYear();
@@ -127,14 +170,12 @@
         return 2;
     }
 
-    // 時間文字列から「何マス目か」のインデックスを計算する (9:00が0番目)
     function timeToLeftIndex(timeStr) {
         const [h, m] = timeStr.split(':').map(Number);
         const totalMins = (h - 9) * 60 + m;
         return Math.floor(totalMins / 15);
     }
 
-    // マス目インデックスから時間文字列に変える (0 -> "09:00")
     function leftIndexToTime(index) {
         const totalMins = index * 15;
         const h = 9 + Math.floor(totalMins / 60);
@@ -151,13 +192,15 @@
     function renderScreen() {
         const tasksContainer = document.getElementById('pending-tasks-container');
         const rowsBox = document.getElementById('timeline-rows-box');
+        const tableBody = document.getElementById('admin-table-body');
         
         tasksContainer.innerHTML = '';
         rowsBox.innerHTML = '';
+        tableBody.innerHTML = ''; // テーブルも初期化
 
         const displayDates = getDisplayDates();
 
-        // 各行にマスのコンテナを配置
+        // タイムラインの土台生成
         rowsBox.innerHTML = displayDates.map(date => `
             <div class="timeline-row" data-date="${date}">
                 <div class="day-label">${date.slice(5)}</div>
@@ -170,10 +213,11 @@
         let hasPending = false;
         
         allReservations.forEach(r => {
+            // MongoDBの _id と通常の id 両方に完全対応するセーフティ設計
             const recordId = r._id ? r._id.toString() : (r.id ? r.id.toString() : '');
             const [d, t] = r.datetime.split(' ');
             
-            // タイムラインへの配置（絶対配置を使って滑らかに動かせるように変更）
+            // 1. タイムラインへの配置
             if (displayDates.includes(d)) {
                 const rowEl = document.querySelector(`.timeline-row[data-date="${d}"] .slots-wrapper`);
                 if(rowEl) {
@@ -199,6 +243,7 @@
                 }
             }
 
+            // 2. 上部「未対応タスク」の生成
             if (r.status === 'pending') {
                 hasPending = true;
                 tasksContainer.innerHTML += `
@@ -213,13 +258,39 @@
                                 <div><i class="bi bi-wrench me-1"></i> <strong class="text-primary">${r.menu}</strong></div>
                                 <div><i class="bi bi-clock me-1"></i> ${r.datetime}</div>
                             </div>
-                            <button class="btn btn-success btn-sm w-100 fw-bold" onclick="completeTask('${recordId}')">
+                            <button class="btn btn-success btn-sm w-100 fw-bold mb-1" onclick="completeTask('${recordId}')">
                                 <i class="bi bi-check2-circle me-1"></i> 対応完了 (LINEに確定通知)
                             </button>
                         </div>
                     </div>
                 `;
             }
+
+            // 3. 📋 下部「予約詳細・承認管理テーブル」の行を生成
+            let statusBadge = `<span class="badge bg-warning text-dark">未対応</span>`;
+            if (r.status === 'approved') statusBadge = `<span class="badge bg-success">承認済</span>`;
+            if (r.status === 'rejected') statusBadge = `<span class="badge bg-danger">断り済み</span>`;
+
+            tableBody.innerHTML += `
+                <tr>
+                    <td class="fw-bold">${r.customerName}</td>
+                    <td>${r.carModel}</td>
+                    <td>${r.carNumber || ' - '}</td>
+                    <td>${r.menu}</td>
+                    <td>${r.datetime}</td>
+                    <td>${statusBadge}</td>
+                    <td><input type="text" class="form-control form-control-sm" value="${r.rejectReason || ''}" style="width:100px;" disabled></td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-info btn-sm text-white fw-bold" onclick="showDetail('${recordId}')">
+                                <i class="bi bi-file-earmark-text"></i> 確認
+                            </button>
+                            <button class="btn btn-danger btn-sm fw-bold" onclick="rejectTask('${recordId}')" ${r.status==='rejected'?'disabled':''}>却下</button>
+                            <button class="btn btn-success btn-sm fw-bold" onclick="completeTask('${recordId}')" ${r.status==='approved'?'disabled':''}>承認</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
         });
 
         if (!hasPending) {
@@ -227,60 +298,63 @@
         }
     }
 
-    // 💡 Interact.js を使ったドラッグ＆リサイズ処理のセットアップ
+    // 💡 ボタンを押したときにポップアップを開いて内容を表示する関数
+    function showDetail(id) {
+        const r = allReservations.find(res => (res._id ? res._id.toString() : res.id.toString()) === id);
+        if (!r) {
+            alert('データが見つかりませんでした。');
+            return;
+        }
+
+        const modalBody = document.getElementById('modal-detail-content');
+        // ポップアップの中身をリッチに構築
+        modalBody.innerHTML = `
+            <table class="table table-bordered m-0" style="font-size: 0.9rem;">
+                <tr><th class="bg-light" style="width: 35%;">お客様名</th><td class="fw-bold">${r.customerName} 様</td></tr>
+                <tr><th class="bg-light">車種</th><td>${r.carModel}</td></tr>
+                <tr><th class="bg-light">車両番号</th><td>${r.carNumber || '（未登録）'}</td></tr>
+                <tr><th class="bg-light">作業メニュー</th><td class="text-primary fw-bold">${r.menu}</td></tr>
+                <tr><th class="bg-light">予約日時</th><td class="fw-bold">${r.datetime}</td></tr>
+                <tr><th class="bg-light">現在のステータス</th><td>${r.status === 'approved' ? '🟢 承認・確定済み' : (r.status === 'rejected' ? '🔴 却下・断り済み' : '🟡 未対応（要確認）')}</td></tr>
+                <tr><th class="bg-light">お断り理由</th><td>${r.rejectReason || '（なし）'}</td></tr>
+                <tr><th class="bg-light">LINEユーザーID</th><td><small class="text-muted" style="word-break: break-all;">${r.lineUserId || r.userId || '（Web直受付などIDなし）'}</small></td></tr>
+            </table>
+        `;
+
+        // Bootstrapの命令でモーダルをパッと開く
+        const myModal = new bootstrap.Modal(document.getElementById('detailModal'));
+        myModal.show();
+    }
+
+    // Interact.js のドラッグ＆リサイズ処理
     interact('.reservation-chip').draggable({
-        origin: 'self',
-        inertia: false,
-        modifiers: [
-            interact.modifiers.snap({
-                targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ], // 1マス刻みにスナップ
-                range: Infinity,
-                relativePoints: [ { x: 0, y: 0 } ]
-            })
-        ],
+        origin: 'self', inertia: false,
+        modifiers: [ interact.modifiers.snap({ targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ], range: Infinity, relativePoints: [ { x: 0, y: 0 } ] }) ],
         autoScroll: true,
-        onstart(event) {
-            event.target.classList.add('chip-moving');
-        },
+        onstart(event) { event.target.classList.add('chip-moving'); },
         onmove(event) {
             const target = event.target;
             let x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
-            
-            // 表示エリアからはみ出さない制限
             if (x < 0) x = 0;
-            
             target.style.left = `${x}px`;
             target.setAttribute('data-x', x);
         },
-        onend(event) {
-            event.target.classList.remove('chip-moving');
-            saveDraggedChange(event.target);
-        }
+        onend(event) { event.target.classList.remove('chip-moving'); saveDraggedChange(event.target); }
     }).resizable({
-        edges: { left: false, right: true, bottom: false, top: false }, // 右端だけ引っ張れる
-        modifiers: [
-            interact.modifiers.snapSize({
-                targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ],
-                range: Infinity
-            })
-        ],
+        edges: { left: false, right: true, bottom: false, top: false },
+        modifiers: [ interact.modifiers.snapSize({ targets: [ interact.snappers.grid({ x: CELL_WIDTH, y: 0 }) ], range: Infinity }) ],
         inertia: false,
         onmove(event) {
             const target = event.target;
             let width = event.rect.width;
-            
-            if (width < CELL_WIDTH) width = CELL_WIDTH; // 最低1マス
+            if (width < CELL_WIDTH) width = CELL_WIDTH;
             target.style.width = `${width - 4}px`;
-            
             const slots = Math.round(width / CELL_WIDTH);
             target.setAttribute('data-slots', slots);
         },
-        onend(event) {
-            saveDraggedChange(event.target);
-        }
+        onend(event) { saveDraggedChange(event.target); }
     });
 
-    // 💡 操作が終わったあとにデータをデータベースへ自動保存する関数
     async function saveDraggedChange(target) {
         const id = target.getAttribute('data-id');
         const x = parseFloat(target.getAttribute('data-x')) || 0;
@@ -292,19 +366,14 @@
         const newDatetime = `${date} ${newTime}`;
 
         try {
-            // サーバーのデータベースをPATCHで更新
             const response = await fetch(`/api/reservations/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    datetime: newDatetime,
-                    slotsNeeded: slots // 新しい占有マス数も保存
-                })
+                body: JSON.stringify({ datetime: newDatetime, slotsNeeded: slots })
             });
-            if (!response.ok) throw new Error('時間の保存に失敗しました');
+            if (!response.ok) throw new Error('保存失敗');
             
-            // グローバル配列内のデータを直接書き換えてリフレッシュ
-            const found = allReservations.find(r => (r.id || r._id) === id);
+            const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
             if(found) {
                 found.datetime = newDatetime;
                 found.slotsNeeded = slots;
@@ -312,37 +381,35 @@
             renderScreen();
         } catch (err) {
             console.error(err);
-            alert('通信エラーにより、変更した時間が保存できませんでした。');
-            loadAll(); // 元の形に戻す
+            alert('時間の保存に失敗しました。');
+            loadAll();
         }
     }
 
-    // 対応完了処理
+    // 対応完了・承認処理
     async function completeTask(id) {
-        if(!id || id === 'undefined') {
-            alert("エラー: データのIDが正しく取得できませんでした。");
-            return;
-        }
+        if(!id) return;
         const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
         try {
-            const updateRes = await fetch(`/api/reservations/${id}/approve`, {
-                method: 'PATCH',
-                headers: {'Content-Type': 'application/json'}
-            });
+            const updateRes = await fetch(`/api/reservations/${id}/approve`, { method: 'PATCH', headers: {'Content-Type': 'application/json'} });
             if(!updateRes.ok) throw new Error('サーバー更新失敗');
-
-            await fetch(`/api/notify-line`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ id: id, message: msg })
-            });
-            
+            await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
             window.open('https://manager.line.biz/account/@912ntfos', '_blank');
             loadAll();
-        } catch (error) {
-            console.error(error);
-            alert('処理中にエラーが発生しました。');
-        }
+        } catch (error) { console.error(error); alert('処理中にエラーが発生しました。'); }
+    }
+
+    // 却下処理（スタブ）
+    async function rejectTask(id) {
+        if(!id) return;
+        const reason = prompt("お断りの理由を入力してください（お客様のLINEに通知されます）", "ピット満車のため");
+        if(reason === null) return;
+        const msg = `❌ 【EASE-SMB】大変申し訳ございません。\n以下の理由によりご予約を承ることができませんでした。\n\n理由: ${reason}`;
+        try {
+            await fetch(`/api/reservations/${id}/reject`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ rejectReason: reason }) });
+            await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
+            loadAll();
+        } catch (error) { console.error(error); alert('却下処理に失敗しました。'); }
     }
 
     loadAll();
