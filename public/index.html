@@ -170,7 +170,7 @@
         let hasPending = false;
         
         allReservations.forEach(r => {
-            const recordId = r.id || r._id; 
+            const recordId = r._id ? r._id.toString() : (r.id ? r.id.toString() : '');
             const [d, t] = r.datetime.split(' ');
             
             // タイムラインへの配置（絶対配置を使って滑らかに動かせるように変更）

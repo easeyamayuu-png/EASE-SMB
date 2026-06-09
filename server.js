@@ -75,14 +75,27 @@ app.patch('/api/reservations/:id/approve', async (req, res) => {
 });
 
 // 🔴 API⑤：却下
-app.patch('/api/reservations/:id/reject', async (req, res) => {
-    const { rejectReason } = req.body;
-    const reservation = await Reservation.findByIdAndUpdate(
-        req.params.id, 
-        { status: 'rejected', rejectReason: rejectReason || 'ピット満車のため' }, 
-        { new: true }
-    );
-    res.json(reservation);
-});
+app.patch('/api/reservations/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { datetime, slotsNeeded } = req.body;
+        
+        // 【重要】お使いのデータベース(MongoDB / Nedb / PostgreSQLなど)に合わせて書き換えてください。
+        // 以下は、MongoDB (Mongoose) を使用している場合の一般的な記述例です：
+        const updatedReservation = await Reservation.findByIdAndUpdate(
+            id,
+            { datetime, slotsNeeded },
+            { new: true }
+        );
 
+        if (!updatedReservation) {
+            return res.status(404).json({ error: '該当する予約が見つかりません。' });
+        }
+
+        res.json({ success: true, data: updatedReservation });
+    } catch (error) {
+        console.error('サーバー側での予約更新エラー:', error);
+        res.status(500).json({ error: 'サーバー内部エラーが発生しました。' });
+    }
+});
 app.listen(PORT, () => console.log(`🚀 サーバー起動: ${PORT}`));
