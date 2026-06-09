@@ -38,8 +38,7 @@
     </div>
 
     <h5 class="fw-bold text-danger mb-3"><i class="bi bi-bell-fill text-warning me-2"></i>⚡ 要対応の新規案件（LINE未返信）</h5>
-    <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-3 mb-5">
-        </div>
+    <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-3 mb-5"></div>
 
     <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況（15分刻み）</h5>
     <div class="timeline-container mb-4">
@@ -86,7 +85,6 @@
         let hasPending = false;
         
         data.forEach(r => {
-            // 💡 ここが超重要！ MongoDBの _id または id を確実に取得する
             const recordId = r.id || r._id; 
             
             const [d, t] = r.datetime.split(' ');
@@ -129,8 +127,44 @@
         }
     }
 
-    // ✅ 対応完了ボタンを押したときの処理
-    https://manager.line.biz/account/@912ntfos
+    // ✅ 対応完了ボタンを押したときの処理（別タブ展開付き）
+    async function completeTask(id) {
+        if(!id || id === 'undefined') {
+            alert("エラー: データのIDが正しく取得できませんでした。");
+            return;
+        }
+
+        const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
+        
+        try {
+            // 1. サーバーのステータスを更新
+            const updateRes = await fetch(`/api/reservations/${id}/approve`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            if(!updateRes.ok) throw new Error('サーバー側のステータス更新に失敗しました。');
+
+            // 2. LINE通知の送信
+            const lineRes = await fetch(`/api/notify-line`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id, message: msg })
+            });
+
+            if(!lineRes.ok) console.warn('LINE通知の送信に失敗しましたが、ステータスは更新されました。');
+            
+            // 💡 別ウィンドウ（別タブ）でLINE Official Account Managerを開く
+            window.open('https://manager.line.biz/account/@912ntfos', '_blank');
+            
+            // 再読み込みして表示を最新にする
+            loadAll();
+            
+        } catch (error) {
+            console.error('処理エラー:', error);
+            alert('処理中にエラーが発生しました。開発者ツール(F12)のコンソールを確認してください。');
+        }
+    }
 
     // 初回読み込み
     loadAll();
