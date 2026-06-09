@@ -21,12 +21,34 @@
         .day-label { width: 110px; font-weight: 700; background: #e9ecef; text-align: center; height: 100%; display: flex; align-items: center; justify-content: center; border-right: 2px solid #dee2e6; color: #495057; }
         .slot-cell { width: 45px; height: 100%; border-right: 1px solid #edf2f7; position: relative; display: flex; align-items: center; justify-content: center; }
         
-        /* タイムライン内の予約チップ */
-        .reservation-chip { position: absolute; top: 4px; left: 2px; right: 2px; bottom: 4px; background: #e1f5fe; border: 1px solid #03a9f4; color: #0288d1; font-size: 0.7rem; padding: 2px 4px; border-radius: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: bold; text-align: center; z-index: 5; box-shadow: 0 2px 4px rgba(3,169,244,0.2); }
-        .chip-done { background: #e8f5e9 !important; border-color: #4caf50 !important; color: #2e7d32 !important; box-shadow: none !important; opacity: 0.75; }
+        /* タイムライン内の予約チップ（メニュー可変幅対応） */
+        .reservation-chip { 
+            position: absolute; 
+            top: 4px; 
+            left: 2px; 
+            bottom: 4px; 
+            background: #e1f5fe; 
+            border: 1px solid #03a9f4; 
+            color: #0288d1; 
+            font-size: 0.7rem; 
+            padding: 2px 4px; 
+            border-radius: 6px; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap; 
+            font-weight: bold; 
+            text-align: left; 
+            z-index: 10; 
+            box-shadow: 0 2px 4px rgba(3,169,244,0.2);
+        }
+        .chip-done { background: #e8f5e9 !important; border-color: #4caf50 !important; color: #2e7d32 !important; box-shadow: none !important; opacity: 0.85; }
         
         /* 時間軸のヘッダー用の幅微調整 */
         .time-head { width: 180px; text-align: center; font-size: 0.75rem; background: #495057; border-right: 1px solid #6c757d; padding: 4px 0; }
+        
+        /* 日付ナビゲーション */
+        .date-nav-btn { background: #fff; border: 1px solid #ced4da; padding: 5px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .date-nav-btn:hover { background: #e9ecef; border-color: #adb5bd; }
     </style>
 </head>
 <body>
@@ -40,7 +62,15 @@
     <h5 class="fw-bold text-danger mb-3"><i class="bi bi-bell-fill text-warning me-2"></i>⚡ 要対応の新規案件（LINE未返信）</h5>
     <div id="pending-tasks-container" class="row row-cols-1 row-cols-md-3 g-3 mb-5"></div>
 
-    <h5 class="fw-bold text-secondary mb-3"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況（15分刻み）</h5>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="fw-bold text-secondary m-0"><i class="bi bi-calendar3 text-primary me-2"></i>📅 ピットスケジュール状況（可変幅タイムライン）</h5>
+        <div class="d-flex align-items-center gap-2">
+            <button class="date-nav-btn" onclick="moveDate(-4)"><i class="bi bi-chevron-left"></i> 前の4日間</button>
+            <button class="date-nav-btn" onclick="resetToToday()">今日に戻る</button>
+            <button class="date-nav-btn" onclick="moveDate(4)">次の4日間 <i class="bi bi-chevron-right"></i></button>
+        </div>
+    </div>
+
     <div class="timeline-container mb-4">
         <div class="timeline-header-row mb-1">
             <div style="width: 110px;" class="text-center py-2">日付</div>
@@ -56,9 +86,47 @@
 </div>
 
 <script>
-    // 9:00 〜 18:00 までの1時間ごと
     const hours = Array.from({length: 10}, (_, i) => i + 9);
     const mins = ['00', '15', '30', '45'];
+    const CELL_WIDTH = 45; // 1マスの幅(px) CSSの.slot-cellのwidthと合わせる
+
+    let currentStartDate = new Date('2026-06-09');
+
+    function formatDate(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function getDisplayDates() {
+        const dates = [];
+        for (let i = 0; i < 4; i++) {
+            const tempDate = new Date(currentStartDate);
+            tempDate.setDate(currentStartDate.getDate() + i);
+            dates.push(formatDate(tempDate));
+        }
+        return dates;
+    }
+
+    function moveDate(days) {
+        currentStartDate.setDate(currentStartDate.getDate() + days);
+        loadAll();
+    }
+
+    function resetToToday() {
+        currentStartDate = new Date('2026-06-09');
+        loadAll();
+    }
+
+    // 💡 メニューに応じた「占有マス数」を返す関数
+    function getSlotCount(menu) {
+        if (!menu) return 2; // 不明な場合は30分(2マス)
+        if (menu.includes('オイル')) return 1;    // 15分
+        if (menu.includes('車検見積')) return 2;  // 30分
+        if (menu.includes('12ヶ月') || menu.includes('点検')) return 8; // 2時間(8マス)
+        return 2; // デフォルト30分(2マス)
+    }
 
     async function loadAll() {
         const res = await fetch('/api/reservations');
@@ -70,9 +138,8 @@
         tasksContainer.innerHTML = '';
         rowsBox.innerHTML = '';
 
-        // 1. タイムラインの行（日付）の土台を作って並べる
-        const dates = [...new Set(data.map(r => r.datetime.split(' ')[0]))].sort();
-        rowsBox.innerHTML = dates.map(date => `
+        const displayDates = getDisplayDates();
+        rowsBox.innerHTML = displayDates.map(date => `
             <div class="timeline-row">
                 <div class="day-label">${date.slice(5)}</div>
                 <div class="d-flex h-100">
@@ -81,24 +148,33 @@
             </div>
         `).join('');
 
-        // 2. データを「未対応タスク」と「タイムライン」に振り分け配置
         let hasPending = false;
         
         data.forEach(r => {
             const recordId = r.id || r._id; 
-            
             const [d, t] = r.datetime.split(' ');
             const [h, m] = t.split(':');
             
-            // タイムラインセルに配置
-            const slotId = `slot-${d}-${String(h).padStart(2,'0')}-${m}`;
-            const slot = document.getElementById(slotId);
-            if(slot) {
-                const isDone = r.status === 'approved';
-                slot.innerHTML = `<div class="reservation-chip ${isDone ? 'chip-done' : ''}" title="${r.customerName}様 / ${r.menu}">${r.customerName}</div>`;
+            if (displayDates.includes(d)) {
+                const slotId = `slot-${d}-${String(h).padStart(2,'0')}-${m}`;
+                const slot = document.getElementById(slotId);
+                if(slot) {
+                    const isDone = r.status === 'approved';
+                    
+                    // 💡 可変幅の計算処理
+                    const slotsNeeded = getSlotCount(r.menu);
+                    // マス数 × 1マス幅 から、左右の余白分(4px)を引いてピッタリ合わせる
+                    const chipWidth = (slotsNeeded * CELL_WIDTH) - 4; 
+
+                    slot.innerHTML = `
+                        <div class="reservation-chip ${isDone ? 'chip-done' : ''}" 
+                             style="width: ${chipWidth}px;" 
+                             title="${r.customerName}様 / ${r.menu} (${slotsNeeded * 15}分)">
+                             ${r.customerName}様 (${r.menu})
+                        </div>`;
+                }
             }
 
-            // 未対応（pending）であれば上部にカードを生成
             if (r.status === 'pending') {
                 hasPending = true;
                 tasksContainer.innerHTML += `
@@ -127,7 +203,6 @@
         }
     }
 
-    // ✅ 対応完了ボタンを押したときの処理（別タブ展開付き）
     async function completeTask(id) {
         if(!id || id === 'undefined') {
             alert("エラー: データのIDが正しく取得できませんでした。");
@@ -137,36 +212,28 @@
         const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
         
         try {
-            // 1. サーバーのステータスを更新
             const updateRes = await fetch(`/api/reservations/${id}/approve`, {
                 method: 'PATCH',
                 headers: {'Content-Type': 'application/json'}
             });
-            
             if(!updateRes.ok) throw new Error('サーバー側のステータス更新に失敗しました。');
 
-            // 2. LINE通知の送信
             const lineRes = await fetch(`/api/notify-line`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ id: id, message: msg })
             });
-
-            if(!lineRes.ok) console.warn('LINE通知の送信に失敗しましたが、ステータスは更新されました。');
+            if(!lineRes.ok) console.warn('LINE通知の送信に失敗しました。');
             
-            // 💡 別ウィンドウ（別タブ）でLINE Official Account Managerを開く
             window.open('https://manager.line.biz/account/@912ntfos', '_blank');
-            
-            // 再読み込みして表示を最新にする
             loadAll();
             
         } catch (error) {
             console.error('処理エラー:', error);
-            alert('処理中にエラーが発生しました。開発者ツール(F12)のコンソールを確認してください。');
+            alert('処理中にエラーが発生しました。コンソールを確認してください。');
         }
     }
 
-    // 初回読み込み
     loadAll();
 </script>
 </body>
