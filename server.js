@@ -41,7 +41,7 @@ app.post('/api/reservations', async (req, res) => {
 
 // 🔔 API②：LINE通知（※既に定義済みですが整理しました）
 app.post('/api/notify-line', async (req, res) => {
-    const { message } = req.body;
+    const { id, message } = req.body;
     try {
         const response = await fetch('https://api.line.me/v2/bot/message/push', {
             method: 'POST',
@@ -58,7 +58,7 @@ app.post('/api/notify-line', async (req, res) => {
         res.status(200).json(result);
     } catch (error) {
         console.error('LINE連携エラー:', error);
-        res.status(500).send('LINE通知失敗');
+        res.status(500).json({ error: 'LINE通知失敗' });
     }
 });
 
