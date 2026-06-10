@@ -3,139 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EASE-SMB ピット空き状況</title>
+    <title>EASE-SMB ピット空き状況確認</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
-        body { background-color: #f8f9fa; font-size: 0.9rem; color: #333; font-family: 'Helvetica Neue', Arial, sans-serif; }
-        .main-card { background: white; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: none; }
+        body { background-color: #f8f9fa; font-family: 'Helvetica Neue', Arial, sans-serif; }
+        .status-header { background: linear-gradient(135deg, #0d6efd, #0a58ca); color: white; padding: 20px 10px; text-align: center; border-radius: 0 0 20px 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .calendar-card { background: white; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: none; }
+        .table-status th { background-color: #f1f3f5; font-weight: bold; text-align: center; font-size: 0.85rem; padding: 10px 5px; }
+        .table-status td { text-align: center; vertical-align: middle; height: 50px; font-size: 0.8rem; padding: 6px 4px; border-bottom: 1px solid #eed; }
+        .date-cell { font-weight: bold; background-color: #ffffff; width: 75px; border-right: 2px solid #dee2e6 !important; }
         
-        /* タイムライン表のカスタム */
-        .timeline-table { margin-bottom: 0; vertical-align: middle; }
-        .timeline-table th { background: #343a40; color: white; font-weight: bold; text-align: center; font-size: 0.8rem; padding: 10px 5px; }
-        .day-col { width: 90px; font-weight: bold; background: #f1f3f5 !important; text-align: center; color: #495057; border-right: 2px solid #dee2e6 !important; }
+        /* 記号ステータスの装飾 */
+        .status-ok { color: #198754; font-weight: bold; font-size: 1.2rem; cursor: pointer; transition: transform 0.1s; }
+        .status-ok:active { transform: scale(0.9); }
+        .status-few { color: #ffc107; font-weight: bold; font-size: 1.1rem; cursor: pointer; }
+        .status-ng { color: #dc3545; font-weight: bold; font-size: 1.1rem; background-color: #f8d7da; border-radius: 4px; display: inline-block; width: 28px; height: 28px; line-height: 28px; }
         
-        /* 15分マスのデザイン */
-        .slot-cell { width: 40px; height: 50px; text-align: center; padding: 0; position: relative; font-size: 0.75rem; border-right: 1px solid #edf2f7; }
-        
-        /* 空き状況記号の装飾 */
-        .status-symbol { font-weight: bold; font-size: 1.1rem; display: block; line-height: 50px; width: 100%; height: 100%; }
-        .status-ok { color: #198754; background: #e8f5e9; } /* 〇 空き */
-        .status-ng { color: #dc3545; background: #ffe3e3; font-size: 0.9rem; } /* × 満車 */
-        
-        /* 凡例 */
-        .legend-box { display: inline-flex; align-items: center; gap: 15px; background: #e9ecef; padding: 8px 16px; border-radius: 30px; font-size: 0.8rem; }
+        .legend-box { background: #fff; border-radius: 10px; padding: 10px; font-size: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .nav-btn { border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
     </style>
 </head>
 <body>
-<div class="container-fluid py-4" style="max-width: 1000px;">
-    
-    <div class="text-center mb-4">
-        <h3 class="fw-bold text-dark mb-1"><i class="bi bi-calendar-check text-primary me-2"></i>EASE-SMB ピット空き状況</h3>
-        <p class="text-muted small m-0">リアルタイムの空き状況です。ご予約の目安にご利用ください。</p>
+
+<div class="status-header mb-3">
+    <h5 class="fw-bold m-0"><i class="bi bi-calendar-check me-2"></i>ピット空き状況（リアルタイム）</h5>
+    <p class="small m-0 mt-1 opacity-75">「〇」をタップするとその時間でLINE予約へ進めます</p>
+</div>
+
+<div class="container-fluid px-2">
+    <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+        <button class="btn btn-outline-primary btn-sm nav-btn px-2" onclick="moveDate(-4)"><i class="bi bi-chevron-left"></i> 前の4日</button>
+        <span class="fw-bold text-secondary" id="display-range" style="font-size:0.85rem;"></span>
+        <button class="btn btn-outline-primary btn-sm nav-btn px-2" onclick="moveDate(4)">次の4日 <i class="bi bi-chevron-right"></i></button>
     </div>
 
-    <div class="text-center mb-3">
-        <div class="legend-box">
-            <span><strong class="text-success">○</strong>：入庫可能</span>
-            <span><strong class="text-danger">×</strong>：満車（受付終了）</span>
-        </div>
-    </div>
-
-    <div class="card main-card p-2 p-md-3">
+    <div class="card calendar-card p-1 mb-3">
         <div class="table-responsive">
-            <table class="table table-bordered timeline-table">
+            <table class="table table-sm m-0 table-status">
                 <thead>
-                    <tr>
-                        <th rowspan="2" style="vertical-align: middle; width: 90px;">日付</th>
-                        <th colspan="4">9:00</th>
-                        <th colspan="4">10:00</th>
-                        <th colspan="4">11:00</th>
-                        <th colspan="4">12:00</th>
-                        <th colspan="4">13:00</th>
-                        <th colspan="4">14:00</th>
-                        <th colspan="4">15:00</th>
-                        <th colspan="4">16:00</th>
-                        <th colspan="4">17:00</th>
-                        <th colspan="4">18:00</th>
-                    </tr>
-                    <tr id="sub-header-row">
+                    <tr id="table-hours-header">
+                        <th class="date-cell">日付</th>
                         </tr>
                 </thead>
-                <tbody id="client-timeline-body">
+                <tbody id="status-calendar-body">
                     </tbody>
             </table>
         </div>
     </div>
 
-    <div class="text-center mt-4">
-        <p class="text-muted small">※作業内容（重整備など）によっては、○の時間帯でも調整が必要な場合がございます。</p>
-        <a href="https://line.me/R/ti/p/%40912ntfos" class="btn btn-success fw-bold px-4 py-2 shadow-sm rounded-pill">
-            <i class="bi bi-line me-2"></i>LINE公式アカウントから予約する
-        </a>
+    <div class="legend-box d-flex justify-content-around text-center mb-4 text-muted">
+        <div><span class="text-success fw-bold fs-5">〇</span> 空きあり</div>
+        <div><span class="text-warning fw-bold fs-5">△</span> 残りわずか</div>
+        <div><span class="text-danger fw-bold fs-6 bg-danger-subtle px-1 rounded">×</span> 空きなし</div>
     </div>
-
 </div>
 
 <script>
-    const hours = Array.from({length: 10}, (_, i) => i + 9);
-    const mins = ['00', '15', '30', '45'];
+    // 2026年6月10日を基準
+    const TODAY_STR = '2026-06-10';
+    let currentStartDate = new Date(TODAY_STR);
+    let allReservations = [];
 
-    // サブヘッダー（分刻み目盛り）の自動生成
-    const subHeader = document.getElementById('sub-header-row');
-    subHeader.innerHTML = hours.map(() => mins.map(m => `<th style="font-size:0.6rem; font-weight:normal; padding:2px; background:#495057;">${m}</th>`).join('')).join('');
+    // 表示する時間帯（1時間単位で列を作るが、内部は15分単位で計算）
+    const displayHours = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+    const PIT_LIMIT = 1; // 1ピット運用（15分コマ内に1件でもあれば埋まる）
 
-    async function loadTimeline() {
+    // ヘッダー（時間）の生成
+    const headerRow = document.getElementById('table-hours-header');
+    displayHours.forEach(h => {
+        headerRow.innerHTML += `<th>${h}:00</th>`;
+    });
+
+    function formatDate(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function getDisplayDates() {
+        const dates = [];
+        for (let i = 0; i < 4; i++) {
+            const tempDate = new Date(currentStartDate);
+            tempDate.setDate(currentStartDate.getDate() + i);
+            dates.push(formatDate(tempDate));
+        }
+        return dates;
+    }
+
+    function moveDate(days) {
+        currentStartDate.setDate(currentStartDate.getDate() + days);
+        renderCalendar();
+    }
+
+    async function loadData() {
         try {
             const res = await fetch('/api/reservations');
-            const data = await res.json();
-            
-            const tbody = document.getElementById('client-timeline-body');
-            tbody.innerHTML = '';
-
-            // 1. 未来の日付を含む一連の日付リストを抽出
-            const dates = [...new Set(data.map(r => r.datetime.split(' ')[0]))].sort();
-
-            if(dates.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="41" class="text-center py-4 text-muted">現在、表示できるスケジュールがありません。</td></tr>`;
-                return;
-            }
-
-            // 2. 日付ごとに行を作成
-            dates.forEach(date => {
-                let rowHtml = `<tr>`;
-                // 日付ラベル（例：06-09）
-                rowHtml += `<td class="day-col">${date.slice(5)}</td>`;
-
-                // 9:00〜18:45までの全マスをチェック
-                hours.forEach(h => {
-                    mins.forEach(m => {
-                        const timeStr = `${String(h).padStart(2, '0')}:${m}`;
-                        const fullDatetime = `${date} ${timeStr}`;
-
-                        // 💡 その時間に「既に対応完了(approved)または未対応(pending)」の予約が入っているか調べる
-                        // お客様画面なので、仮予約(pending)が入っている場所も「×（満車）」として扱い、重複を防ぎます
-                        const isBooked = data.some(r => r.datetime === fullDatetime && r.status !== 'rejected');
-
-                        if (isBooked) {
-                            rowHtml += `<td class="slot-cell"><span class="status-symbol status-ng">×</span></td>`;
-                        } else {
-                            rowHtml += `<td class="slot-cell"><span class="status-symbol status-ok">○</span></td>`;
-                        }
-                    });
-                });
-
-                rowHtml += `</tr>`;
-                tbody.innerHTML += rowHtml;
-            });
-
-        } catch (error) {
-            console.error('データ読み込みエラー:', error);
+            allReservations = await res.json();
+            renderCalendar();
+        } catch (err) {
+            console.error("データ読み込み失敗:", err);
         }
     }
 
-    // 起動時に実行
-    loadTimeline();
+    // 各メニューの標準必要コマ数（フォールバック用）
+    function getMenuSlots(menu) {
+        if (!menu) return 2;
+        if (menu.includes('オイル')) return 1;    // 15分
+        if (menu.includes('車検見積')) return 2;  // 30分
+        if (menu.includes('12ヶ月') || menu.includes('点検')) return 8; // 2時間
+        return 2;
+    }
+
+    // 時刻文字列（"09:15"など）から15分単位のインデックス（0〜39）に変換
+    function timeToSlotIndex(timeStr) {
+        if(!timeStr) return 0;
+        const [h, m] = timeStr.split(':').map(Number);
+        const totalMins = (h - 9) * 60 + m;
+        return Math.floor(totalMins / 15);
+    }
+
+    function renderCalendar() {
+        const displayDates = getDisplayDates();
+        
+        // 範囲テキスト更新
+        document.getElementById('display-range').innerText = 
+            `${displayDates[0].slice(5)} ～ ${displayDates[3].slice(5)}`;
+
+        const tbody = document.getElementById('status-calendar-body');
+        tbody.innerHTML = '';
+
+        displayDates.forEach(dateStr => {
+            // 💡 1日分（9:00〜19:00＝10時間×4コマ＝40個）の15分枠を用意
+            const timeSlots = Array(40).fill(0);
+
+            // この日の「お断り(rejected)」以外の予約を抽出
+            const dayReservations = allReservations.filter(r => {
+                const [d, _] = r.datetime.split(' ');
+                return d === dateStr && r.status !== 'rejected';
+            });
+
+            // 💡 【修正ポイント】予約データが占有する全枠にフラグを立てる
+            dayReservations.forEach(r => {
+                const [_, t] = r.datetime.split(' ');
+                const startIdx = timeToSlotIndex(t);
+                
+                // DBの実際のコマ数(slotsNeeded)を最優先で取得、無ければメニューのデフォルト
+                const slots = (r.slotsNeeded !== undefined && r.slotsNeeded !== null) ? parseInt(r.slotsNeeded) : getMenuSlots(r.menu);
+
+                // 予約がカバーする全コマを「使用中」としてカウント加算
+                for (let i = 0; i < slots; i++) {
+                    const currentIdx = startIdx + i;
+                    if (currentIdx >= 0 && currentIdx < 40) {
+                        timeSlots[currentIdx] += 1;
+                    }
+                }
+            });
+
+            // 画面のテーブル行を組み立て（1時間単位でループ）
+            let rowHtml = `<tr><td class="date-cell">${dateStr.slice(5)}<br><small class="text-muted">${getWeekday(dateStr)}</small></td>`;
+
+            displayHours.forEach((hour, hIdx) => {
+                // 💡 1時間の中にある4つの15分コマ（例：10:00, 10:15, 10:30, 10:45）の状態をチェック
+                const startSlotOfHour = hIdx * 4;
+                const nextHourSlots = timeSlots.slice(startSlotOfHour, startSlotOfHour + 4);
+
+                // 1時間（4コマ）のうち、何コマ埋まっているかをカウント
+                const filledCount = nextHourSlots.filter(count => count >= PIT_LIMIT).length;
+
+                let cellId = `${dateStr}_${String(hour).padStart(2,'0')}:00`;
+                let statusMark = '';
+
+                if (filledCount === 4) {
+                    // 1時間すべて（4コマ全て）ピットが埋まっている場合は「×」
+                    statusMark = `<span class="status-ng">×</span>`;
+                } else if (filledCount > 0) {
+                    // 一部（15分〜45分間）だけ予約が入っている場合は「△（残りわずか）」
+                    statusMark = `<span class="status-few" onclick="goToLine('${dateStr}', '${hour}:00')">△</span>`;
+                } else {
+                    // 全く埋まっていなければ「〇（空きあり）」
+                    statusMark = `<span class="status-ok" onclick="goToLine('${dateStr}', '${hour}:00')">〇</span>`;
+                }
+
+                rowHtml += `<td id="${cellId}">${statusMark}</td>`;
+            });
+
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        });
+    }
+
+    function getWeekday(dateStr) {
+        const weeks = ['日', '月', '火', '水', '木', '金', '土'];
+        return weeks[new Date(dateStr).getDay()];
+    }
+
+    function goToLine(date, time) {
+        // LIFFのURLまたはLINE公式アカウントのトーク画面URL
+        // 予約日時をテキストで持たせて送るなどの導線用
+        const encDate = encodeURIComponent(`${date} ${time}:00`);
+        window.location.href = `https://line.me/R/oaMessage/@912ntfos/?【Web空き状況から予約】\n希望日時: ${date} ${time}`;
+    }
+
+    // 初回読み込み
+    loadData();
 </script>
+
 </body>
 </html>
