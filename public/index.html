@@ -18,7 +18,6 @@
         .timeline-header-row { display: flex; background: #343a40; color: white; border-radius: 4px 4px 0 0; font-weight: bold; align-items: center; }
         .timeline-row { display: flex; border-bottom: 1px solid #e9ecef; height: 45px; align-items: center; position: relative; }
         
-        /* 💡 日付ラベル枠の中に「＋」ボタンが入るよう縦並び・幅100pxに調整 */
         .day-label { width: 100px; font-weight: 700; background: #e9ecef; text-align: center; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 2px solid #dee2e6; color: #495057; z-index: 20; font-size: 0.75rem; gap: 2px; }
         .slots-wrapper { display: flex; height: 100%; flex-grow: 1; position: relative; }
         .slot-cell { width: 30px; height: 100%; border-right: 1px solid #edf2f7; }
@@ -168,7 +167,6 @@
     let currentStartDate = new Date(TODAY_STR);
     let allReservations = []; 
 
-    // 手動フォーム用の時間選択肢を生成
     const timeSelect = document.getElementById('form-time');
     hours.forEach(h => {
         mins.forEach(m => {
@@ -235,7 +233,6 @@
         }
     }
 
-    // 💡 変更箇所②：新規登録用のポップアップを呼び出す処理
     function openCreateModal(dateStr) {
         document.getElementById('form-target-date').value = dateStr;
         document.getElementById('manual-reservation-form').reset();
@@ -243,7 +240,7 @@
         createModal.show();
     }
 
-    // 💡 変更箇所③：フォーム送信時に直接サーバーに登録して配置する
+    // 💡 【修正ポイント】手動配置データを登録する際、status: 'approved'（承認済・確定）で保存
     document.getElementById('manual-reservation-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const date = document.getElementById('form-target-date').value;
@@ -257,7 +254,9 @@
             menu: menu,
             datetime: `${date} ${time}`,
             slotsNeeded: getSlotCount(menu),
-            status: 'approved' // 管理者直接なので最初から承認済(確定)で配置
+            status: 'approved', // 💡 最初から「承認済」ステータスにして空き状況を埋める
+            lineUserId: 'manual-entry', // 💡 LINE送信時のクラッシュを防ぐ識別子
+            rejectReason: ''
         };
 
         try {
@@ -268,9 +267,8 @@
             });
             if(!res.ok) throw new Error('手動登録失敗');
             
-            // モーダルを閉じてデータを再読み込み
             bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
-            loadAll();
+            loadAll(); // 再読み込みして空き状況とテーブルを同期
         } catch (err) {
             console.error(err);
             alert('登録に失敗しました。');
@@ -288,7 +286,6 @@
 
         const displayDates = getDisplayDates();
 
-        // 💡 変更箇所④：各日の左側に「＋ 新規配置」ボタンを実装
         rowsBox.innerHTML = displayDates.map(date => `
             <div class="timeline-row" data-date="${date}">
                 <div class="day-label">
@@ -483,28 +480,43 @@
 
     async function completeTask(id) {
         if(!id) return;
+        
+        // 💡 【修正ポイント】手動受付データの場合はLINE通知をスキップして完了させる
+        const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
+        const isManual = found && found.lineUserId === 'manual-entry';
+
         const msg = `✅ 【EASE-SMB】ご予約が確定しました！\nご来店をお待ちしております。`;
         try {
             const updateRes = await fetch(`/api/reservations/${id}/approve`, { method: 'PATCH', headers: {'Content-Type': 'application/json'} });
             if(!updateRes.ok) throw new Error('サーバー更新失敗');
-            await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
-            const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
+            
+            if (!isManual) {
+                await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
+                window.open('https://manager.line.biz/account/@912ntfos', '_blank');
+            }
+            
             if(found) found.status = 'approved';
-            window.open('https://manager.line.biz/account/@912ntfos', '_blank');
             renderScreen();
         } catch (error) { console.error(error); alert('処理中にエラーが発生しました。'); }
     }
 
     async function rejectTask(id) {
         if(!id) return;
-        const reason = prompt("お断りの理由を入力してください（お客様のLINEに通知されます）", "ピット満車のため");
+        
+        const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
+        const isManual = found && found.lineUserId === 'manual-entry';
+
+        const reason = prompt("お断りの理由を入力してください", "ピット満車のため");
         if(reason === null) return;
         const msg = `❌ 【EASE-SMB】大変申し訳ございません。\n以下の理由によりご予約を承ることができませんでした。\n\n理由: ${reason}`;
         try {
             const res = await fetch(`/api/reservations/${id}/reject`, { method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ rejectReason: reason }) });
             if(!res.ok) throw new Error('API失敗');
-            await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
-            const found = allReservations.find(r => (r._id ? r._id.toString() : r.id.toString()) === id);
+            
+            if (!isManual) {
+                await fetch(`/api/notify-line`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ id: id, message: msg }) });
+            }
+            
             if(found) {
                 found.status = 'rejected';
                 found.rejectReason = reason;
